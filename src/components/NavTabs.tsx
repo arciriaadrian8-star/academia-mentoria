@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
-export function NavTabs({ tabs }: { tabs: { href: string; label: string }[] }) {
+export function NavTabs({ tabs }: { tabs: { href: string; label: string; badge?: number }[] }) {
   const pathname = usePathname();
   return (
     <nav className="-mb-px flex gap-1 overflow-x-auto pt-2">
@@ -20,6 +20,11 @@ export function NavTabs({ tabs }: { tabs: { href: string; label: string }[] }) {
             )}
           >
             {tab.label}
+            {Boolean(tab.badge) && (
+              <span className="ml-1.5 inline-flex min-w-5 items-center justify-center rounded-full bg-amber-500 px-1.5 text-[11px] font-bold text-white">
+                {tab.badge}
+              </span>
+            )}
           </Link>
         );
       })}

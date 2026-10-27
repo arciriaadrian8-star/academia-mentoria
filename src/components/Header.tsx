@@ -9,17 +9,19 @@ export function Header({
   profile,
   isStaff,
   isAdmin,
+  pendingCount = 0,
 }: {
   settings: Settings;
   profile: Profile;
   isStaff: boolean;
   isAdmin: boolean;
+  pendingCount?: number;
 }) {
   const tabs = [
     { href: "/comunidad", label: "Comunidad" },
     { href: "/classroom", label: "Classroom" },
     { href: "/calendario", label: "Calendario" },
-    ...(isAdmin ? [{ href: "/miembros", label: "Miembros" }, { href: "/ajustes", label: "Ajustes" }] : []),
+    ...(isAdmin ? [{ href: "/miembros", label: "Miembros", badge: pendingCount }, { href: "/ajustes", label: "Ajustes" }] : []),
   ];
 
   return (

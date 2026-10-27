@@ -8,6 +8,8 @@ export interface Profile {
   bio: string | null;
   role: Role;
   active: boolean;
+  /** Se registró solo y está esperando que el admin le dé acceso. */
+  pending: boolean;
   created_at: string;
 }
 
@@ -23,6 +25,8 @@ export interface Settings {
   primary_color: string;
   logo_url: string | null;
   welcome_message: string | null;
+  allow_signup: boolean;
+  auto_approve: boolean;
 }
 
 export interface Course {

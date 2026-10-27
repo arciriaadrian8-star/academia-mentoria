@@ -1,0 +1,9 @@
+# Configuración para publicar en Netlify (detecta Next.js automáticamente).
+# Las claves de Supabase NO van aquí: se ponen en Netlify > Project configuration > Environment variables.
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "22"
+  NEXT_TELEMETRY_DISABLED = "1"

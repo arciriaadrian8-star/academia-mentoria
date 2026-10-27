@@ -18,6 +18,7 @@ create table public.profiles (
   bio         text,
   role        text not null default 'member' check (role in ('admin', 'coach', 'member')),
   active      boolean not null default false,
+  pending     boolean not null default false,  -- se registró solo y espera aprobación
   created_at  timestamptz not null default now()
 );
 
@@ -174,7 +175,9 @@ create table public.settings (
   tagline          text default 'Mentoría 1 a 1',
   primary_color    text not null default '#4f46e5',
   logo_url         text,
-  welcome_message  text default '¡Bienvenido/a a la academia! Empieza por el Classroom y revisa el calendario de sesiones.'
+  welcome_message  text default '¡Bienvenido/a a la academia! Empieza por el Classroom y revisa el calendario de sesiones.',
+  allow_signup     boolean not null default true,   -- mostrar «Crear cuenta» en el login
+  auto_approve     boolean not null default false   -- dar acceso sin aprobación manual
 );
 insert into public.settings (id) values (1);
 
@@ -254,22 +257,26 @@ $$;
 -- TRIGGERS
 -- =====================================================================
 
--- Al crear un usuario en Auth se crea su perfil.
+-- Al crear un usuario en Auth (registro con email, Google o alta desde el panel) se crea su perfil.
 -- El PRIMER usuario de la academia se convierte en admin automáticamente.
--- El resto queda inactivo hasta que el admin lo active (o lo cree desde el panel).
+-- El resto queda PENDIENTE de aprobación (salvo que actives la aprobación automática en Ajustes).
 create or replace function public.handle_new_user()
 returns trigger language plpgsql security definer set search_path = public as $$
 declare
   is_first boolean;
+  approve boolean;
 begin
   select not exists (select 1 from public.profiles) into is_first;
-  insert into public.profiles (id, email, full_name, role, active)
+  select coalesce((select auto_approve from public.settings where id = 1), false) into approve;
+  insert into public.profiles (id, email, full_name, avatar_url, role, active, pending)
   values (
     new.id,
     new.email,
-    coalesce(new.raw_user_meta_data ->> 'full_name', ''),
+    coalesce(new.raw_user_meta_data ->> 'full_name', new.raw_user_meta_data ->> 'name', ''),
+    coalesce(new.raw_user_meta_data ->> 'avatar_url', new.raw_user_meta_data ->> 'picture'),
     case when is_first then 'admin' else 'member' end,
-    is_first
+    is_first or approve,
+    not (is_first or approve)
   );
   return new;
 end;
@@ -287,6 +294,7 @@ begin
     new.role   := old.role;
     new.active := old.active;
     new.email  := old.email;
+    new.pending := old.pending;
   end if;
   return new;
 end;
@@ -456,40 +464,36 @@ revoke all on all tables in schema public from anon;
 grant select on public.settings to anon;
 
 revoke select on public.profiles from authenticated;
-grant select (id, full_name, avatar_url, bio, role, active, created_at) on public.profiles to authenticated;
+grant select (id, full_name, avatar_url, bio, role, active, pending, created_at) on public.profiles to authenticated;
 
 -- =====================================================================
 -- STORAGE (archivos)
---   public-assets : portadas de cursos, fotos de perfil, logo (público)
+--   public-assets : imágenes (portadas, fotos de perfil, logo, imágenes de lecciones y posts). Máx. 10 MB
 --   course-files  : vídeos y recursos de las lecciones (PRIVADO)
 -- =====================================================================
-insert into storage.buckets (id, name, public) values ('public-assets', 'public-assets', true)
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+  values ('public-assets', 'public-assets', true, 10485760, array['image/*'])
   on conflict (id) do nothing;
 insert into storage.buckets (id, name, public) values ('course-files', 'course-files', false)
   on conflict (id) do nothing;
 
--- public-assets: cada usuario sube su avatar en avatars/{su_id}/...; el staff sube el resto.
+-- public-assets: cada usuario sube su foto en avatars/{su_id}/ y las imágenes de sus posts en posts/{su_id}/;
+-- el staff puede subir en cualquier carpeta.
+create or replace function public.can_write_public_asset(object_name text)
+returns boolean language sql stable security definer set search_path = public as $$
+  select public.is_staff() or (
+    public.is_active()
+    and split_part(object_name, '/', 1) in ('avatars', 'posts')
+    and split_part(object_name, '/', 2) = auth.uid()::text
+  )
+$$;
+
 create policy "assets: subir" on storage.objects
-  for insert to authenticated with check (
-    bucket_id = 'public-assets' and (
-      public.is_staff()
-      or (split_part(name, '/', 1) = 'avatars' and split_part(name, '/', 2) = auth.uid()::text)
-    )
-  );
+  for insert to authenticated with check (bucket_id = 'public-assets' and public.can_write_public_asset(name));
 create policy "assets: actualizar" on storage.objects
-  for update to authenticated using (
-    bucket_id = 'public-assets' and (
-      public.is_staff()
-      or (split_part(name, '/', 1) = 'avatars' and split_part(name, '/', 2) = auth.uid()::text)
-    )
-  );
+  for update to authenticated using (bucket_id = 'public-assets' and public.can_write_public_asset(name));
 create policy "assets: borrar" on storage.objects
-  for delete to authenticated using (
-    bucket_id = 'public-assets' and (
-      public.is_staff()
-      or (split_part(name, '/', 1) = 'avatars' and split_part(name, '/', 2) = auth.uid()::text)
-    )
-  );
+  for delete to authenticated using (bucket_id = 'public-assets' and public.can_write_public_asset(name));
 
 -- course-files: solo lo leen quienes tienen acceso al curso; solo el staff sube/borra.
 create policy "course-files: leer con acceso" on storage.objects

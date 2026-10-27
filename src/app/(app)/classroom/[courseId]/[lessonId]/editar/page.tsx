@@ -5,6 +5,7 @@ import { requireStaff } from "@/lib/auth";
 import type { Lesson, LessonFile, Module } from "@/lib/types";
 import { formatBytes } from "@/lib/utils";
 import { ConfirmButton } from "@/components/ConfirmButton";
+import { MarkdownEditor } from "@/components/MarkdownEditor";
 import { PageHeader } from "@/components/PageHeader";
 import { SubmitButton } from "@/components/SubmitButton";
 import { deleteLesson, deleteLessonFile, updateLesson } from "../../../actions";
@@ -60,16 +61,17 @@ export default async function EditLessonPage({ params }: { params: Promise<{ cou
 
         <div>
           <label className="label" htmlFor="content">Contenido / notas de la lección</label>
-          <textarea
+          <MarkdownEditor
             id="content"
             name="content"
+            folder={`lessons/${courseId}`}
             rows={14}
             defaultValue={lesson.content ?? ""}
-            className="input font-mono text-[13px] leading-relaxed"
             placeholder={"## Lo que aprenderás\n\n- Punto 1\n- Punto 2\n\n**Tarea:** escribe tus objetivos en la comunidad."}
           />
           <p className="hint">
-            Formato: <code>## Título</code>, <code>**negrita**</code>, <code>- listas</code>, <code>[texto](https://enlace.com)</code>.
+            Añade imágenes con el botón «Imagen», pegándolas (Ctrl+V) o arrastrándolas. Formato: <code>## Título</code>,{" "}
+            <code>**negrita**</code>, <code>- listas</code>.
           </p>
         </div>
 

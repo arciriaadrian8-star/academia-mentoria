@@ -11,6 +11,9 @@ export async function GET(request: NextRequest) {
   const target = new URL(searchParams.get("next") ?? "/", origin);
   const next = target.origin === origin ? `${target.pathname}${target.search}` : "/";
 
+  // Google u otro proveedor devolvió un error (ej. el usuario canceló).
+  if (searchParams.get("error")) return NextResponse.redirect(new URL("/login?error=oauth", origin));
+
   const supabase = await createClient();
   let ok = false;
   if (code) {

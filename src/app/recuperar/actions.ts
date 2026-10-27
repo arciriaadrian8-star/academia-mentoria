@@ -1,6 +1,6 @@
 "use server";
 
-import { headers } from "next/headers";
+import { getOrigin } from "@/lib/site";
 import { createClient } from "@/lib/supabase/server";
 import { str } from "@/lib/utils";
 
@@ -8,8 +8,7 @@ export async function requestReset(_prev: { sent?: boolean; error?: string } | n
   const email = str(formData, "email").toLowerCase();
   if (!email) return { error: "Escribe tu email." };
 
-  const h = await headers();
-  const origin = process.env.NEXT_PUBLIC_SITE_URL || `${h.get("x-forwarded-proto") ?? "https"}://${h.get("host")}`;
+  const origin = await getOrigin();
 
   const supabase = await createClient();
   await supabase.auth.resetPasswordForEmail(email, {

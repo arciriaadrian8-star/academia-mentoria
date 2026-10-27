@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { Profile, Settings } from "@/lib/types";
 
 /** Columnas visibles para los usuarios (el email solo lo lee el servidor). */
-export const PROFILE_COLUMNS = "id, full_name, avatar_url, bio, role, active, created_at";
+export const PROFILE_COLUMNS = "id, full_name, avatar_url, bio, role, active, pending, created_at";
 
 export const getSession = cache(async () => {
   const supabase = await createClient();
@@ -46,6 +46,8 @@ const DEFAULT_SETTINGS: Settings = {
   primary_color: "#4f46e5",
   logo_url: null,
   welcome_message: null,
+  allow_signup: true,
+  auto_approve: false,
 };
 
 export const getSettings = cache(async (): Promise<Settings> => {

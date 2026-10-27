@@ -1,8 +1,16 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession, getSettings } from "@/lib/auth";
+import { getAuthProviders } from "@/lib/authProviders";
 import { createAdminClient, hasAdminKey } from "@/lib/supabase/admin";
 import { AuthCard } from "../AuthCard";
+import { GoogleButton, OrDivider } from "../GoogleButton";
 import { LoginForm } from "./LoginForm";
+
+const NOTICES: Record<string, string> = {
+  link: "El enlace ha caducado o no es válido. Pide uno nuevo.",
+  oauth: "No se pudo iniciar sesión con Google. Inténtalo de nuevo.",
+};
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const { user } = await getSession();
@@ -15,10 +23,26 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   }
 
   const { error } = await searchParams;
-  const settings = await getSettings();
+  const [settings, providers] = await Promise.all([getSettings(), getAuthProviders()]);
+  const canSignUp = settings.allow_signup && !providers.signupDisabled;
+
   return (
     <AuthCard settings={settings} title="Inicia sesión" subtitle={settings.tagline ?? undefined}>
-      <LoginForm notice={error === "link" ? "El enlace ha caducado o no es válido. Pide uno nuevo." : undefined} />
+      {providers.google && (
+        <>
+          <GoogleButton />
+          <OrDivider />
+        </>
+      )}
+      <LoginForm notice={error ? NOTICES[error] : undefined} />
+      {canSignUp && (
+        <p className="mt-5 text-center text-sm text-zinc-500">
+          ¿No tienes cuenta?{" "}
+          <Link href="/registro" className="font-semibold text-brand hover:underline">
+            Regístrate
+          </Link>
+        </p>
+      )}
     </AuthCard>
   );
 }

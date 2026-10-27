@@ -10,6 +10,8 @@ import { UpcomingEvents } from "@/components/UpcomingEvents";
 import { Composer } from "./Composer";
 import { AuthorLine, LikeButton } from "./PostParts";
 
+const IMAGE_MD = /!\[[^\]]*\]\((https?:\/\/[^)\s]+)\)/g;
+
 interface PostRow {
   id: string;
   title: string;
@@ -46,7 +48,7 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
   return (
     <div className="grid items-start gap-6 lg:grid-cols-[1fr_300px]">
       <div className="min-w-0 space-y-4">
-        <Composer name={profile.full_name || profile.email} avatarUrl={profile.avatar_url} isStaff={isStaff} />
+        <Composer userId={user.id} name={profile.full_name || profile.email} avatarUrl={profile.avatar_url} isStaff={isStaff} />
 
         <div className="flex gap-2 overflow-x-auto pb-1">
           {[{ id: "", label: "Todo" }, ...POST_CATEGORIES].map((c) => (
@@ -70,12 +72,18 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
         ) : (
           posts.map((post) => {
             const liked = post.post_likes.some((l) => l.user_id === user.id);
+            const image = [...post.body.matchAll(IMAGE_MD)][0]?.[1];
+            const preview = post.body.replace(IMAGE_MD, "").trim();
             return (
               <article key={post.id} className={cn("card p-5", post.pinned && "ring-1 ring-amber-200")}>
                 <AuthorLine author={post.author} date={post.created_at} category={post.category} pinned={post.pinned} />
                 <Link href={`/comunidad/${post.id}`} className="mt-3 block">
                   <h2 className="text-lg font-bold hover:text-brand">{post.title}</h2>
-                  {post.body && <p className="mt-1 line-clamp-3 text-sm whitespace-pre-line text-zinc-600">{post.body}</p>}
+                  {preview && <p className="mt-1 line-clamp-3 text-sm whitespace-pre-line text-zinc-600">{preview}</p>}
+                  {image && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={image} alt="" className="mt-3 max-h-80 w-full rounded-xl border border-zinc-100 object-cover" />
+                  )}
                 </Link>
                 <div className="mt-3 flex items-center gap-1">
                   <LikeButton postId={post.id} liked={liked} count={post.post_likes.length} />

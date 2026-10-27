@@ -2,10 +2,10 @@
 
 import { randomInt } from "node:crypto";
 import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getSettings, requireAdmin } from "@/lib/auth";
 import { LEVEL_COLORS } from "@/lib/constants";
+import { getOrigin } from "@/lib/site";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Credentials, Role } from "@/lib/types";
 import { str } from "@/lib/utils";
@@ -18,9 +18,7 @@ function generatePassword() {
 }
 
 async function loginUrl() {
-  if (process.env.NEXT_PUBLIC_SITE_URL) return `${process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "")}/login`;
-  const h = await headers();
-  return `${h.get("x-forwarded-proto") ?? "https"}://${h.get("host")}/login`;
+  return `${await getOrigin()}/login`;
 }
 
 async function setLevels(userId: string, levels: string[]) {
@@ -51,7 +49,7 @@ export async function createMember(_prev: Credentials | null, formData: FormData
     return { error: exists ? "Ya existe un usuario con ese email." : `No se pudo crear: ${error?.message}` };
   }
 
-  await admin.from("profiles").update({ full_name: fullName, role, active: true }).eq("id", data.user.id);
+  await admin.from("profiles").update({ full_name: fullName, role, active: true, pending: false }).eq("id", data.user.id);
   await setLevels(data.user.id, formData.getAll("levels").map(String));
   revalidatePath("/miembros");
 
@@ -68,6 +66,7 @@ export async function updateMember(formData: FormData) {
     const role = str(formData, "role") as Role;
     if (ROLES.includes(role)) update.role = role;
     update.active = formData.get("active") === "on";
+    if (update.active) update.pending = false;
   }
   const admin = createAdminClient();
   const { error } = await admin.from("profiles").update(update).eq("id", id);
@@ -75,6 +74,28 @@ export async function updateMember(formData: FormData) {
   await setLevels(id, formData.getAll("levels").map(String));
   revalidatePath("/miembros", "layout");
   redirect(`/miembros/${id}?guardado=1`);
+}
+
+/** Da acceso a alguien que se registró por su cuenta. */
+export async function approveMember(formData: FormData) {
+  await requireAdmin();
+  const id = str(formData, "id");
+  const { error } = await createAdminClient().from("profiles").update({ active: true, pending: false }).eq("id", id);
+  if (error) throw error;
+  await setLevels(id, formData.getAll("levels").map(String));
+  revalidatePath("/", "layout");
+}
+
+/** Rechaza una solicitud: borra la cuenta registrada. */
+export async function rejectMember(formData: FormData) {
+  const { user } = await requireAdmin();
+  const id = str(formData, "id");
+  if (id === user.id) return;
+  const admin = createAdminClient();
+  const { data: profile } = await admin.from("profiles").select("pending").eq("id", id).single();
+  if (!profile?.pending) return;
+  await admin.auth.admin.deleteUser(id);
+  revalidatePath("/", "layout");
 }
 
 export async function resetMemberPassword(_prev: Credentials | null, formData: FormData): Promise<Credentials> {

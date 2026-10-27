@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/Avatar";
 import { LevelChips } from "@/components/LevelChips";
 import { EmptyState, PageHeader } from "@/components/PageHeader";
+import { PendingRequests } from "./PendingRequests";
 
 export default async function MembersPage({ searchParams }: { searchParams: Promise<{ q?: string; nivel?: string }> }) {
   const { q, nivel } = await searchParams;
@@ -23,7 +24,9 @@ export default async function MembersPage({ searchParams }: { searchParams: Prom
   const levelsOf = (userId: string) =>
     levels.filter((l) => access.some((a) => a.user_id === userId && a.access_level_id === l.id));
 
-  let members = (profilesRes.data ?? []) as Profile[];
+  const allProfiles = (profilesRes.data ?? []) as Profile[];
+  const requests = allProfiles.filter((m) => m.pending);
+  let members = allProfiles.filter((m) => !m.pending);
   if (q) {
     const term = q.toLowerCase();
     members = members.filter((m) => `${m.full_name} ${m.email}`.toLowerCase().includes(term));
@@ -40,6 +43,8 @@ export default async function MembersPage({ searchParams }: { searchParams: Prom
           <Plus className="size-4" /> Nuevo miembro
         </Link>
       </PageHeader>
+
+      <PendingRequests requests={requests} levels={levels} />
 
       <form className="mb-4 flex flex-wrap gap-2">
         <div className="relative min-w-60 flex-1">

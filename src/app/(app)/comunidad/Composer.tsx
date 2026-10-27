@@ -3,10 +3,21 @@
 import { useRef, useState } from "react";
 import { POST_CATEGORIES } from "@/lib/constants";
 import { Avatar } from "@/components/Avatar";
+import { MarkdownEditor } from "@/components/MarkdownEditor";
 import { SubmitButton } from "@/components/SubmitButton";
 import { createPost } from "./actions";
 
-export function Composer({ name, avatarUrl, isStaff }: { name: string; avatarUrl: string | null; isStaff: boolean }) {
+export function Composer({
+  userId,
+  name,
+  avatarUrl,
+  isStaff,
+}: {
+  userId: string;
+  name: string;
+  avatarUrl: string | null;
+  isStaff: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -30,7 +41,7 @@ export function Composer({ name, avatarUrl, isStaff }: { name: string; avatarUrl
       className="card space-y-3 p-4"
     >
       <input name="title" required autoFocus placeholder="Título" className="input text-base font-semibold" />
-      <textarea name="body" rows={5} placeholder="Comparte una pregunta, un logro o un recurso..." className="input" />
+      <MarkdownEditor name="body" folder={`posts/${userId}`} rows={5} placeholder="Comparte una pregunta, un logro o un recurso... (puedes pegar imágenes)" />
       <div className="flex flex-wrap items-center justify-between gap-2">
         <select name="category" defaultValue="general" className="input w-auto py-1.5">
           {POST_CATEGORIES.filter((c) => !c.staffOnly || isStaff).map((c) => (

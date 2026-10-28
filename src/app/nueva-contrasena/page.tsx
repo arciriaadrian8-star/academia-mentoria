@@ -9,7 +9,7 @@ export default async function NewPasswordPage() {
   const settings = await getSettings();
   return (
     <AuthCard settings={settings} title="Nueva contraseña" subtitle="Elige una contraseña de al menos 8 caracteres.">
-      <NewPasswordForm />
+      <NewPasswordForm email={user.email ?? ""} />
     </AuthCard>
   );
 }

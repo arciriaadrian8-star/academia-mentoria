@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { getOrigin } from "@/lib/site";
+import { getRequestOrigin } from "@/lib/site";
 import { createClient } from "@/lib/supabase/server";
 import { str } from "@/lib/utils";
 
@@ -24,7 +24,7 @@ export async function signInWithGoogle(_prev: { error?: string } | null) {
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
-    options: { redirectTo: `${await getOrigin()}/auth/confirm?next=/` },
+    options: { redirectTo: `${await getRequestOrigin()}/auth/confirm?next=/` },
   });
   if (error || !data.url) return { error: "No se pudo conectar con Google. Inténtalo de nuevo." };
   redirect(data.url);

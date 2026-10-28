@@ -13,7 +13,7 @@ export function LoginForm({ notice }: { notice?: string }) {
       <FormMessage error={state?.error ?? notice} />
       <div>
         <label className="label" htmlFor="email">Email</label>
-        <input id="email" name="email" type="email" required autoComplete="email" className="input" />
+        <input id="email" name="email" type="email" required autoComplete="username" className="input" />
       </div>
       <div>
         <div className="flex items-center justify-between">

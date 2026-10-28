@@ -1,6 +1,6 @@
 "use server";
 
-import { getOrigin } from "@/lib/site";
+import { getRequestOrigin } from "@/lib/site";
 import { createClient } from "@/lib/supabase/server";
 import { str } from "@/lib/utils";
 
@@ -8,7 +8,7 @@ export async function requestReset(_prev: { sent?: boolean; error?: string } | n
   const email = str(formData, "email").toLowerCase();
   if (!email) return { error: "Escribe tu email." };
 
-  const origin = await getOrigin();
+  const origin = await getRequestOrigin();
 
   const supabase = await createClient();
   await supabase.auth.resetPasswordForEmail(email, {

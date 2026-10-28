@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { getSettings } from "@/lib/auth";
-import { getOrigin } from "@/lib/site";
+import { getRequestOrigin } from "@/lib/site";
 import { createClient } from "@/lib/supabase/server";
 import { str } from "@/lib/utils";
 
@@ -26,7 +26,7 @@ export async function register(
     password,
     options: {
       data: { full_name: fullName },
-      emailRedirectTo: `${await getOrigin()}/auth/confirm?next=/`,
+      emailRedirectTo: `${await getRequestOrigin()}/auth/confirm?next=/`,
     },
   });
 

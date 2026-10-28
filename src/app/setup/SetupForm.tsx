@@ -20,7 +20,7 @@ export function SetupForm() {
       </div>
       <div>
         <label className="label" htmlFor="email">Tu email</label>
-        <input id="email" name="email" type="email" required className="input" />
+        <input id="email" name="email" type="email" required autoComplete="username" className="input" />
       </div>
       <div>
         <label className="label" htmlFor="password">Contraseña</label>

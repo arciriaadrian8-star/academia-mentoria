@@ -18,9 +18,15 @@ export function Header({
   pendingCount?: number;
 }) {
   const tabs = [
+    { href: "/inicio", label: "Inicio" },
     { href: "/comunidad", label: "Comunidad" },
     { href: "/classroom", label: "Classroom" },
     { href: "/calendario", label: "Calendario" },
+    { href: "/sesiones", label: "Sesiones" },
+    { href: "/herramientas", label: "Herramientas" },
+    { href: "/plataformas", label: "Plataformas" },
+    { href: "/ranking", label: "Ranking" },
+    { href: "/beneficios", label: "Beneficios" },
     ...(isAdmin ? [{ href: "/miembros", label: "Miembros", badge: pendingCount }, { href: "/ajustes", label: "Ajustes" }] : []),
   ];
 

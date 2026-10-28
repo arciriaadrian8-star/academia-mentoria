@@ -22,5 +22,8 @@ export async function GET(request: NextRequest) {
     ok = !(await supabase.auth.verifyOtp({ type, token_hash: tokenHash })).error;
   }
 
-  return NextResponse.redirect(new URL(ok ? next : "/login?error=link", origin));
+  if (ok) return NextResponse.redirect(new URL(next, origin));
+  // Enlace de recuperar contraseña caducado, ya usado o abierto en otro navegador.
+  const failure = next.startsWith("/nueva-contrasena") || type === "recovery" ? "/recuperar?error=enlace" : "/login?error=link";
+  return NextResponse.redirect(new URL(failure, origin));
 }

@@ -32,7 +32,7 @@ export function RegisterForm() {
       </div>
       <div>
         <label className="label" htmlFor="email">Email</label>
-        <input id="email" name="email" type="email" required autoComplete="email" className="input" />
+        <input id="email" name="email" type="email" required autoComplete="username" className="input" />
       </div>
       <div>
         <label className="label" htmlFor="password">Contraseña</label>

@@ -8,7 +8,7 @@ import { GoogleButton, OrDivider } from "../GoogleButton";
 import { LoginForm } from "./LoginForm";
 
 const NOTICES: Record<string, string> = {
-  link: "El enlace ha caducado o no es válido. Pide uno nuevo.",
+  link: "El enlace ha caducado o ya se usó. Si querías cambiar tu contraseña, pulsa «¿Olvidaste tu contraseña?» y pide uno nuevo.",
   oauth: "No se pudo iniciar sesión con Google. Inténtalo de nuevo.",
 };
 

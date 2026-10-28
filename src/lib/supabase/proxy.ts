@@ -8,6 +8,16 @@ export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
   if (!isConfigured()) return response;
 
+  // Si Supabase devolvió el enlace del email a la página principal (o al login) en vez de a
+  // /auth/confirm, lo reenviamos para completar el cambio de contraseña.
+  const { pathname, searchParams } = request.nextUrl;
+  if ((pathname === "/" || pathname === "/login") && (searchParams.has("code") || searchParams.has("token_hash"))) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/auth/confirm";
+    if (!url.searchParams.has("next")) url.searchParams.set("next", "/nueva-contrasena");
+    return NextResponse.redirect(url);
+  }
+
   const supabase = createServerClient(SUPABASE_URL, SUPABASE_KEY, {
     cookies: {
       getAll() {

@@ -157,35 +157,67 @@ async function uploadToGemini(bytes: Uint8Array, mime: string, name: string) {
   throw new Error("El video tardó demasiado en procesarse. Prueba con un video más corto.");
 }
 
+async function callModel(model: string, fileUri: string, mime: string, prompt: string, thinking: Record<string, unknown> | null) {
+  const generationConfig: Record<string, unknown> = {
+    responseMimeType: "application/json",
+    responseSchema: SCHEMA,
+    temperature: 0.8,
+    mediaResolution: "MEDIA_RESOLUTION_LOW",
+  };
+  if (thinking) generationConfig.thinkingConfig = thinking;
+  return gemini(`/v1beta/models/${model}:generateContent`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ contents: [{ role: "user", parts: [{ file_data: { mime_type: mime, file_uri: fileUri } }, { text: prompt }] }], generationConfig }),
+  });
+}
+
 async function generate(fileUri: string, mime: string, prompt: string) {
   let lastError = "";
+  let busy = false;
   for (const model of MODELS) {
-    const res = await gemini(`/v1beta/models/${model}:generateContent`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ file_data: { mime_type: mime, file_uri: fileUri } }, { text: prompt }] }],
-        generationConfig: { responseMimeType: "application/json", responseSchema: SCHEMA, temperature: 0.8, mediaResolution: "MEDIA_RESOLUTION_LOW" },
-      }),
-    });
-    if (res.status === 404) {
-      lastError = `Modelo ${model} no disponible`;
-      continue;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      let res = await callModel(model, fileUri, mime, prompt, { thinkingLevel: "low" });
+      if (res.status === 400) res = await callModel(model, fileUri, mime, prompt, { thinkingBudget: 512 });
+      if (res.status === 400) res = await callModel(model, fileUri, mime, prompt, null);
+      if (res.status === 404) {
+        lastError = `Modelo ${model} no disponible`;
+        break;
+      }
+      if (res.status === 503 || res.status === 429 || res.status === 500) {
+        busy = true;
+        lastError = `Gemini saturado (${res.status})`;
+        await new Promise((r) => setTimeout(r, 4000 * (attempt + 1)));
+        continue;
+      }
+      const data = await res.json();
+      if (!res.ok) throw new Error(`Gemini respondió con error (${res.status}): ${JSON.stringify(data).slice(0, 300)}`);
+      const text = data?.candidates?.[0]?.content?.parts?.map((p: { text?: string; thought?: boolean }) => (p.thought ? "" : p.text ?? "")).join("") ?? "";
+      if (!text) throw new Error("La IA no devolvió respuesta (puede que el video haya sido bloqueado por las políticas de contenido).");
+      return { model, result: JSON.parse(text) };
     }
-    const data = await res.json();
-    if (!res.ok) throw new Error(`Gemini respondió con error (${res.status}): ${JSON.stringify(data).slice(0, 300)}`);
-    const text = data?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text ?? "").join("") ?? "";
-    if (!text) throw new Error("La IA no devolvió respuesta (puede que el video haya sido bloqueado por las políticas de contenido).");
-    return { model, result: JSON.parse(text) };
   }
+  if (busy) throw new Error("La IA de Google está saturada en este momento. Intenta de nuevo en unos minutos.");
   throw new Error(lastError || "No hay modelo de Gemini disponible");
 }
 
-async function process(id: string) {
-  const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+const adminClient = () => createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+
+async function fail(id: string, e: unknown, videoPath?: string | null, geminiFile?: string | null) {
+  const admin = adminClient();
+  await admin
+    .from("ai_scripts")
+    .update({ status: "error", result: null, error: String((e as Error)?.message ?? e).slice(0, 1000), finished_at: new Date().toISOString() })
+    .eq("id", id);
+  if (geminiFile) await gemini(`/v1beta/${geminiFile}`, { method: "DELETE" }).catch(() => {});
+  if (videoPath) await admin.storage.from("ai-videos").remove([videoPath]).catch(() => {});
+}
+
+/** Fase 1: sube el video a Gemini y espera a que esté listo. Luego llama a la fase 2 en otra invocación. */
+async function phaseUpload(id: string, selfUrl: string) {
+  const admin = adminClient();
   const { data: row } = await admin.from("ai_scripts").select("*").eq("id", id).single();
   if (!row) return;
-  let geminiFile: string | null = null;
   try {
     if (!key()) throw new Error("Falta configurar GEMINI_API_KEY en los secretos de Supabase.");
     if (!row.video_path) throw new Error("No se encontró el video.");
@@ -194,20 +226,45 @@ async function process(id: string) {
     const bytes = new Uint8Array(await blob.arrayBuffer());
     const mime = blob.type && blob.type.startsWith("video/") ? blob.type : "video/mp4";
     const file = await uploadToGemini(bytes, mime, `${row.id}.mp4`);
-    geminiFile = file.name;
-    const { model, result } = await generate(file.uri, file.mimeType ?? mime, buildPrompt(row));
+    await admin.storage.from("ai-videos").remove([row.video_path]).catch(() => {});
+    await admin
+      .from("ai_scripts")
+      .update({ video_path: null, result: { _stage: "subido", _file: { name: file.name, uri: file.uri, mime: file.mimeType ?? mime } } })
+      .eq("id", id);
+    await fetch(selfUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`, apikey: Deno.env.get("SUPABASE_ANON_KEY")! },
+      body: JSON.stringify({ id, phase: "generate" }),
+    });
+  } catch (e) {
+    await fail(id, e, row.video_path);
+  }
+}
+
+/** Fase 2: genera el análisis y el guion. Solo corre si la fase 1 dejó el archivo listo. */
+async function phaseGenerate(id: string) {
+  const admin = adminClient();
+  const { data: row } = await admin.from("ai_scripts").select("*").eq("id", id).single();
+  const file = row?.result?._file as { name: string; uri: string; mime: string } | undefined;
+  if (!row || row.status !== "procesando" || row.result?._stage !== "subido" || !file) return;
+  // marcar como tomada para que no corra dos veces
+  const { data: claimed } = await admin
+    .from("ai_scripts")
+    .update({ result: { _stage: "generando", _file: file } })
+    .eq("id", id)
+    .eq("result->>_stage", "subido")
+    .select("id")
+    .maybeSingle();
+  if (!claimed) return;
+  try {
+    const { model, result } = await generate(file.uri, file.mime, buildPrompt(row));
     await admin
       .from("ai_scripts")
       .update({ status: "listo", result: { ...result, modelo: model }, finished_at: new Date().toISOString(), error: null })
       .eq("id", id);
+    await gemini(`/v1beta/${file.name}`, { method: "DELETE" }).catch(() => {});
   } catch (e) {
-    await admin
-      .from("ai_scripts")
-      .update({ status: "error", error: String((e as Error).message ?? e).slice(0, 1000), finished_at: new Date().toISOString() })
-      .eq("id", id);
-  } finally {
-    if (geminiFile) await gemini(`/v1beta/${geminiFile}`, { method: "DELETE" }).catch(() => {});
-    if (row.video_path) await admin.storage.from("ai-videos").remove([row.video_path]).catch(() => {});
+    await fail(id, e, null, file.name);
   }
 }
 
@@ -215,21 +272,27 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "Método no permitido" }, 405);
 
+  const { id, phase } = await req.json().catch(() => ({}));
+  if (!id) return json({ error: "Falta el id" }, 400);
+
+  // Fase 2 (llamada interna): solo avanza filas que la fase 1 dejó listas.
+  if (phase === "generate") {
+    // @ts-ignore EdgeRuntime existe en Supabase
+    EdgeRuntime.waitUntil(phaseGenerate(id));
+    return json({ ok: true }, 202);
+  }
+
   const auth = req.headers.get("Authorization") ?? "";
   const userClient = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: auth } } });
   const { data: userData } = await userClient.auth.getUser();
   const user = userData?.user;
   if (!user) return json({ error: "No autorizado" }, 401);
 
-  const { id } = await req.json().catch(() => ({}));
-  if (!id) return json({ error: "Falta el id" }, 400);
-
-  // RLS: solo puede leer su propia fila
-  const { data: row } = await userClient.from("ai_scripts").select("id, user_id, status").eq("id", id).maybeSingle();
+  const { data: row } = await userClient.from("ai_scripts").select("id, user_id, status, result").eq("id", id).maybeSingle();
   if (!row || row.user_id !== user.id) return json({ error: "No encontrado" }, 404);
-  if (row.status !== "procesando") return json({ ok: true, status: row.status });
+  if (row.status !== "procesando" || row.result) return json({ ok: true, status: row.status });
 
-  const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+  const admin = adminClient();
   const { data: profile } = await admin.from("profiles").select("role, active").eq("id", user.id).single();
   if (!profile?.active) return json({ error: "Cuenta inactiva" }, 403);
   if (profile.role === "student") {
@@ -241,7 +304,8 @@ Deno.serve(async (req) => {
     }
   }
 
+  const selfUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/analizar-video`;
   // @ts-ignore EdgeRuntime existe en Supabase
-  EdgeRuntime.waitUntil(process(id));
+  EdgeRuntime.waitUntil(phaseUpload(id, selfUrl));
   return json({ ok: true, status: "procesando" }, 202);
 });

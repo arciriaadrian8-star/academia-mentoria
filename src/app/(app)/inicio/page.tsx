@@ -25,11 +25,11 @@ import { markWelcomeSeen } from "./actions";
 const SHORTCUTS = [
   { href: "/classroom", label: "Classroom", text: "Tus cursos y lecciones", icon: GraduationCap },
   { href: "/sesiones", label: "Sesiones grupales", text: "Estudia y trabaja con otros alumnos", icon: Users },
-  { href: "/calculadoras", label: "Calculadoras", text: "Rentabilidad, precios y anuncios", icon: Calculator },
-  { href: "/plataformas", label: "Plataformas", text: "Dropi, Shopify, IA y más", icon: LayoutGrid },
+  { href: "/kit", label: "Kit COD", text: "Analizador de campañas, prompts, WhatsApp y más", icon: Calculator },
+  { href: "/kit/ruta", label: "Ruta de 30 días", text: "De cero a tu primera venta", icon: LayoutGrid },
   { href: "/comunidad", label: "Comunidad", text: "Pregunta, comparte y celebra", icon: MessagesSquare },
   { href: "/calendario", label: "Calendario", text: "Clases y sesiones en vivo", icon: CalendarDays },
-  { href: "/ranking", label: "Ranking", text: "Puntos, rangos y medallas", icon: Trophy },
+  { href: "/resultados", label: "Resultados", text: "Ventas reales de los alumnos", icon: Trophy },
   { href: "/herramientas", label: "Herramientas", text: "Google AI Pro, DropKiller, Releasit y más", icon: Gift },
 ];
 

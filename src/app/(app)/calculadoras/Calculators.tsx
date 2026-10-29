@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { BarChart3, Calculator, PackageCheck, Tag } from "lucide-react";
+import { BarChart3, Calculator, PackageCheck, Tag, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const CURRENCIES = [
@@ -23,6 +23,7 @@ const TABS = [
   { id: "precio", label: "Precio ideal", icon: Tag },
   { id: "anuncios", label: "Métricas de anuncios", icon: BarChart3 },
   { id: "logistica", label: "Efectividad logística", icon: PackageCheck },
+  { id: "flujo", label: "Flujo de caja", icon: Wallet },
 ] as const;
 type TabId = (typeof TABS)[number]["id"];
 
@@ -31,6 +32,7 @@ const DEFAULTS: Record<TabId, Values> = {
   precio: { cost: "25000", ship: "15000", returnShip: "15000", fee: "0", other: "0", cpa: "18000", delivery: "70", margin: "20" },
   anuncios: { spend: "300000", impressions: "60000", clicks: "1200", orders: "20", revenue: "1798000", maxCpa: "" },
   logistica: { generated: "100", confirmed: "85", shipped: "80", delivered: "62", returned: "14" },
+  flujo: { orders: "20", cpa: "18000", price: "89900", cost: "25000", ship: "15000", returnShip: "15000", delivery: "70", payout: "12", days: "30" },
 };
 
 const STORAGE_KEY = "academia-calculadoras-v1";
@@ -54,7 +56,7 @@ export function Calculators() {
     const saved = load();
     if (saved) {
       setCurrency(saved.currency ?? "COP");
-      setValues({ ...DEFAULTS, ...saved.values });
+      setValues({ ...DEFAULTS, ...saved.values, flujo: { ...DEFAULTS.flujo, ...(saved.values?.flujo ?? {}) } });
     }
     setLoaded(true);
   }, []);
@@ -107,6 +109,7 @@ export function Calculators() {
       {tab === "precio" && <PriceFinder v={current} set={set} money={money} decimals={meta.decimals} />}
       {tab === "anuncios" && <AdMetrics v={current} set={set} money={money} />}
       {tab === "logistica" && <Logistics v={current} set={set} />}
+      {tab === "flujo" && <CashFlow v={current} set={set} money={money} />}
 
       <p className="flex flex-wrap items-center gap-2 text-xs text-zinc-500">
         Tus datos se guardan solo en este navegador.
@@ -408,6 +411,91 @@ function Logistics({ v, set }: Props) {
             <li>Haz seguimiento a las novedades de la transportadora el mismo día.</li>
             <li>Evita prometer en el anuncio lo que el producto no cumple: dispara las devoluciones.</li>
           </ul>
+        </>
+      }
+    />
+  );
+}
+
+function CashFlow({ v, set, money }: Props & { money: (n: number) => string }) {
+  const orders = num(v, "orders");
+  const cpa = num(v, "cpa");
+  const e = Math.min(Math.max(num(v, "delivery"), 0), 100) / 100;
+  const perDelivered = num(v, "price") - num(v, "cost") - num(v, "ship");
+  const returnShip = num(v, "returnShip");
+  const payout = Math.max(Math.round(num(v, "payout")), 0);
+  const days = Math.min(Math.max(Math.round(num(v, "days")), 1), 120);
+
+  const dailyOut = orders * cpa;
+  const dailyIn = orders * (e * perDelivered - (1 - e) * returnShip);
+  let balance = 0;
+  let lowest = 0;
+  let lowestDay = 0;
+  let positiveDay = -1;
+  const series: number[] = [];
+  for (let d = 1; d <= days; d++) {
+    balance -= dailyOut;
+    if (d > payout) balance += dailyIn;
+    series.push(balance);
+    if (balance < lowest) {
+      lowest = balance;
+      lowestDay = d;
+    }
+    if (positiveDay < 0 && d > payout && balance >= 0) positiveDay = d;
+  }
+  const dailyProfit = dailyIn - dailyOut;
+  const maxAbs = Math.max(...series.map((x) => Math.abs(x)), 1);
+
+  return (
+    <Layout
+      inputs={
+        <>
+          <Field v={v} set={set} k="orders" label="Pedidos al día" />
+          <Field v={v} set={set} k="cpa" label="Costo por pedido en publicidad (CPA)" hint="La publicidad se paga de una vez" />
+          <Field v={v} set={set} k="price" label="Precio de venta" />
+          <Field v={v} set={set} k="cost" label="Costo del producto" />
+          <Field v={v} set={set} k="ship" label="Flete de envío" />
+          <Field v={v} set={set} k="returnShip" label="Flete de devolución" />
+          <Field v={v} set={set} k="delivery" label="Efectividad de entrega" suffix="%" />
+          <Field v={v} set={set} k="payout" label="Días hasta que te pagan" hint="Desde el pedido hasta que llega a tu wallet" />
+          <Field v={v} set={set} k="days" label="Días a proyectar" />
+        </>
+      }
+      results={
+        <>
+          <Result big label="Capital que necesitas para aguantar" value={money(-lowest)} tone="warn" note={`El punto más bajo llega el día ${lowestDay}`} />
+          <Result label="Gasto diario en publicidad" value={money(dailyOut)} />
+          <Result label="Ganancia diaria cuando ya te pagan" value={money(dailyProfit)} tone={dailyProfit > 0 ? "good" : "bad"} />
+          <Result
+            label="Día en que recuperas lo invertido"
+            value={positiveDay > 0 ? `Día ${positiveDay}` : dailyProfit > 0 ? `Después del día ${days}` : "Nunca"}
+            tone={positiveDay > 0 ? "good" : dailyProfit > 0 ? "warn" : "bad"}
+          />
+          <Result label={`Saldo al día ${days}`} value={money(balance)} tone={balance >= 0 ? "good" : "bad"} />
+          <div className="rounded-xl border border-zinc-200 bg-white p-3 sm:col-span-2">
+            <p className="text-xs font-medium text-zinc-500">Tu caja día a día</p>
+            <div className="mt-2 flex h-24 items-center gap-px">
+              {series.map((x, i) => (
+                <div key={i} className="flex h-full flex-1 flex-col" title={`Día ${i + 1}: ${money(x)}`}>
+                  <div className="flex flex-1 items-end border-b border-zinc-200">
+                    {x >= 0 && <div className="w-full rounded-t-sm bg-emerald-400" style={{ height: `${(Math.abs(x) / maxAbs) * 100}%` }} />}
+                  </div>
+                  <div className="flex flex-1 items-start">
+                    {x < 0 && <div className="w-full rounded-b-sm bg-red-400" style={{ height: `${(Math.abs(x) / maxAbs) * 100}%` }} />}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      }
+      explain={
+        <>
+          <p className="font-semibold text-zinc-800">¿Por qué importa?</p>
+          <p className="mt-1">
+            En contra entrega pagas la publicidad hoy, pero el dinero de los pedidos llega días después. Muchas tiendas rentables quiebran por quedarse
+            sin caja al escalar. Antes de subir el presupuesto, asegúrate de tener el capital que te marca esta calculadora.
+          </p>
         </>
       }
     />

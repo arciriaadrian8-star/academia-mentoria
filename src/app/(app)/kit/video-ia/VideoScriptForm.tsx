@@ -8,8 +8,8 @@ import { safeFileName } from "@/lib/utils";
 import { FormMessage } from "@/components/FormMessage";
 import { createScript, type ScriptState } from "./actions";
 
-const MAX_MB = 80;
-const MAX_SECONDS = 180;
+const MAX_MB = 60;
+const MAX_SECONDS = 90;
 
 function videoDuration(file: File) {
   return new Promise<number>((resolve) => {
@@ -39,7 +39,7 @@ export function VideoScriptForm({ userId }: { userId: string }) {
     if (!f.type.startsWith("video/")) return setLocalError("El archivo debe ser un video (MP4 o MOV).");
     if (f.size > MAX_MB * 1024 * 1024) return setLocalError(`El video no puede pesar más de ${MAX_MB} MB.`);
     const d = await videoDuration(f);
-    if (Number.isFinite(d) && d > MAX_SECONDS) return setLocalError("El video no puede durar más de 3 minutos. Recorta solo el anuncio.");
+    if (Number.isFinite(d) && d > MAX_SECONDS) return setLocalError("El video no puede durar más de 90 segundos. Recorta solo el anuncio.");
     setFile(f);
   }
 
@@ -71,7 +71,7 @@ export function VideoScriptForm({ userId }: { userId: string }) {
       >
         {file ? <Film className="size-8 text-emerald-600" /> : <Upload className="size-8 text-zinc-400" />}
         <span className="text-sm font-semibold">{file ? file.name : "Sube el video ganador de referencia"}</span>
-        <span className="text-xs text-zinc-500">{file ? `${(file.size / 1024 / 1024).toFixed(1)} MB` : `MP4 o MOV · máx. ${MAX_MB} MB y 3 minutos`}</span>
+        <span className="text-xs text-zinc-500">{file ? `${(file.size / 1024 / 1024).toFixed(1)} MB` : `MP4 o MOV · máx. ${MAX_MB} MB y 90 segundos`}</span>
         <input type="file" accept="video/*" className="sr-only" onChange={(e) => pick(e.target.files?.[0])} disabled={busy} />
       </label>
 

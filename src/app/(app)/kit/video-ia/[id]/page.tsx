@@ -56,6 +56,12 @@ export default async function ScriptPage({ params }: { params: Promise<{ id: str
   );
   const format = VIDEO_FORMATS.find((f) => f.id === row.format)?.label ?? row.format;
 
+  const stale = row.status === "procesando" && Date.now() - new Date(row.created_at).getTime() > 6 * 60 * 1000;
+  if (stale) {
+    row.status = "error";
+    row.error = "El análisis tardó demasiado y se canceló. Prueba con un video más corto (15 a 60 segundos) o más liviano.";
+  }
+
   if (row.status === "procesando") {
     return (
       <>

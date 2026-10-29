@@ -4,7 +4,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 
 const GEMINI = "https://generativelanguage.googleapis.com";
 const key = () => (Deno.env.get("GEMINI_API_KEY") ?? Deno.env.get("GEMINI_KEY") ?? Deno.env.get("GOOGLE_API_KEY") ?? "").trim();
-const MODELS = [Deno.env.get("GEMINI_MODEL"), "gemini-2.5-flash", "gemini-flash-latest"].filter(Boolean) as string[];
+const MODELS = [Deno.env.get("GEMINI_MODEL"), "gemini-flash-latest", "gemini-2.5-flash"].filter(Boolean) as string[];
 const DAILY_LIMIT = 5;
 
 const cors = {
@@ -165,7 +165,7 @@ async function generate(fileUri: string, mime: string, prompt: string) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         contents: [{ role: "user", parts: [{ file_data: { mime_type: mime, file_uri: fileUri } }, { text: prompt }] }],
-        generationConfig: { responseMimeType: "application/json", responseSchema: SCHEMA, temperature: 0.8 },
+        generationConfig: { responseMimeType: "application/json", responseSchema: SCHEMA, temperature: 0.8, mediaResolution: "MEDIA_RESOLUTION_LOW" },
       }),
     });
     if (res.status === 404) {

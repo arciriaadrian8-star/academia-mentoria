@@ -106,6 +106,7 @@ MI PRODUCTO
 - Formato del nuevo video: ${FORMATS[r.format ?? "mismo"] ?? FORMATS.mismo}
 
 REGLAS DEL GUION
+- OBLIGATORIO: respeta el formato elegido. ${r.format && r.format !== "mismo" ? `El protagonista y el estilo de TODAS las escenas deben ser: ${FORMATS[r.format] ?? ""}. El campo "personaje" describe a ese protagonista (por ejemplo, si es esqueleto, un esqueleto 3D; si es el producto que habla, el producto con ojos y boca).` : "Usa el mismo tipo de protagonista y estilo del video de referencia."}
 - Estructura Adriang Society: GANCHO (0–3 s) → PICO DE INTERÉS → DESARROLLO con demostración → PRUEBA o AUTORIDAD → LLAMADO A LA ACCIÓN con la oferta (envío gratis y pago al recibir).
 - Duración total entre 15 y 35 segundos. Escenas de máximo 8 segundos (es lo que genera Veo/Flow por clip).
 - Todo en español latino, con el vocabulario y acento de ${r.country}.

@@ -4,7 +4,8 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 
 const GEMINI = "https://generativelanguage.googleapis.com";
 const key = () => (Deno.env.get("GEMINI_API_KEY") ?? Deno.env.get("GEMINI_KEY") ?? Deno.env.get("GOOGLE_API_KEY") ?? "").trim();
-const MODELS = [Deno.env.get("GEMINI_MODEL"), "gemini-flash-latest", "gemini-2.5-flash"].filter(Boolean) as string[];
+const MODELS = [Deno.env.get("GEMINI_MODEL"), "gemini-flash-latest", "gemini-flash-lite-latest", "gemini-2.5-flash", "gemini-2.5-flash-lite"].filter(Boolean) as string[];
+const INLINE_MAX = 18 * 1024 * 1024; // hasta 18 MB el video va directo, sin subirlo a Files API
 const DAILY_LIMIT = 5;
 
 const cors = {
@@ -147,17 +148,19 @@ async function uploadToGemini(bytes: Uint8Array, mime: string, name: string) {
   if (!up.ok) throw new Error(`Error subiendo el video a Gemini (${up.status})`);
   const { file } = await up.json();
   // esperar a que el video quede procesado
-  for (let i = 0; i < 40; i++) {
+  for (let i = 0; i < 80; i++) {
     const res = await gemini(`/v1beta/${file.name}`, { method: "GET" });
     const f = await res.json();
     if (f.state === "ACTIVE") return f as { name: string; uri: string; mimeType: string };
     if (f.state === "FAILED") throw new Error("Gemini no pudo procesar el video. Prueba con otro formato (MP4).");
-    await new Promise((r) => setTimeout(r, 3000));
+    await new Promise((r) => setTimeout(r, 1500));
   }
   throw new Error("El video tardó demasiado en procesarse. Prueba con un video más corto.");
 }
 
-async function callModel(model: string, fileUri: string, mime: string, prompt: string, thinking: Record<string, unknown> | null) {
+type Media = { file_data: { mime_type: string; file_uri: string } } | { inline_data: { mime_type: string; data: string } };
+
+async function callModel(model: string, media: Media, prompt: string, thinking: Record<string, unknown> | null) {
   const generationConfig: Record<string, unknown> = {
     responseMimeType: "application/json",
     responseSchema: SCHEMA,
@@ -168,18 +171,18 @@ async function callModel(model: string, fileUri: string, mime: string, prompt: s
   return gemini(`/v1beta/models/${model}:generateContent`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ contents: [{ role: "user", parts: [{ file_data: { mime_type: mime, file_uri: fileUri } }, { text: prompt }] }], generationConfig }),
+    body: JSON.stringify({ contents: [{ role: "user", parts: [media, { text: prompt }] }], generationConfig }),
   });
 }
 
-async function generate(fileUri: string, mime: string, prompt: string) {
+async function generate(media: Media, prompt: string) {
   let lastError = "";
   let busy = false;
   for (const model of MODELS) {
-    for (let attempt = 0; attempt < 3; attempt++) {
-      let res = await callModel(model, fileUri, mime, prompt, { thinkingLevel: "low" });
-      if (res.status === 400) res = await callModel(model, fileUri, mime, prompt, { thinkingBudget: 512 });
-      if (res.status === 400) res = await callModel(model, fileUri, mime, prompt, null);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      let res = await callModel(model, media, prompt, { thinkingLevel: "low" });
+      if (res.status === 400) res = await callModel(model, media, prompt, { thinkingBudget: 0 });
+      if (res.status === 400) res = await callModel(model, media, prompt, null);
       if (res.status === 404) {
         lastError = `Modelo ${model} no disponible`;
         break;
@@ -187,7 +190,8 @@ async function generate(fileUri: string, mime: string, prompt: string) {
       if (res.status === 503 || res.status === 429 || res.status === 500) {
         busy = true;
         lastError = `Gemini saturado (${res.status})`;
-        await new Promise((r) => setTimeout(r, 4000 * (attempt + 1)));
+        // un reintento corto y si sigue ocupado pasamos al siguiente modelo
+        if (attempt === 0) await new Promise((r) => setTimeout(r, 1500));
         continue;
       }
       const data = await res.json();
@@ -199,6 +203,13 @@ async function generate(fileUri: string, mime: string, prompt: string) {
   }
   if (busy) throw new Error("La IA de Google está saturada en este momento. Intenta de nuevo en unos minutos.");
   throw new Error(lastError || "No hay modelo de Gemini disponible");
+}
+
+function toBase64(bytes: Uint8Array) {
+  let bin = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) bin += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  return btoa(bin);
 }
 
 const adminClient = () => createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
@@ -225,6 +236,18 @@ async function phaseUpload(id: string, selfUrl: string) {
     if (error || !blob) throw new Error("No se pudo leer el video subido.");
     const bytes = new Uint8Array(await blob.arrayBuffer());
     const mime = blob.type && blob.type.startsWith("video/") ? blob.type : "video/mp4";
+
+    // Camino rápido: video liviano va directo a la IA en la misma llamada.
+    if (bytes.byteLength <= INLINE_MAX) {
+      const { model, result } = await generate({ inline_data: { mime_type: mime, data: toBase64(bytes) } }, buildPrompt(row));
+      await admin
+        .from("ai_scripts")
+        .update({ status: "listo", video_path: null, result: { ...result, modelo: model }, finished_at: new Date().toISOString(), error: null })
+        .eq("id", id);
+      await admin.storage.from("ai-videos").remove([row.video_path]).catch(() => {});
+      return;
+    }
+
     const file = await uploadToGemini(bytes, mime, `${row.id}.mp4`);
     await admin.storage.from("ai-videos").remove([row.video_path]).catch(() => {});
     await admin
@@ -257,7 +280,7 @@ async function phaseGenerate(id: string) {
     .maybeSingle();
   if (!claimed) return;
   try {
-    const { model, result } = await generate(file.uri, file.mime, buildPrompt(row));
+    const { model, result } = await generate({ file_data: { mime_type: file.mime, file_uri: file.uri } }, buildPrompt(row));
     await admin
       .from("ai_scripts")
       .update({ status: "listo", result: { ...result, modelo: model }, finished_at: new Date().toISOString(), error: null })

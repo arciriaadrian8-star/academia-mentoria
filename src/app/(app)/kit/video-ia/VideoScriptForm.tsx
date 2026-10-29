@@ -124,7 +124,7 @@ export function VideoScriptForm({ userId }: { userId: string }) {
         {busy && <Loader2 className="size-4 animate-spin" />}
         {uploading ? "Subiendo video..." : pending ? "Enviando a la IA..." : "Analizar y crear mi guion"}
       </button>
-      <p className="text-xs text-zinc-500">La IA tarda entre 30 segundos y 2 minutos. El video se borra apenas termina el análisis. Máximo 5 por día.</p>
+      <p className="text-xs text-zinc-500">La IA tarda entre 20 segundos y 1 minuto. El video se borra apenas termina el análisis. Máximo 5 por día.</p>
     </form>
   );
 }

@@ -13,16 +13,16 @@ export function AutoRefresh({ since }: { since: string }) {
     const t = setInterval(() => {
       setNow(Date.now());
       router.refresh();
-    }, 4000);
+    }, 2000);
     return () => clearInterval(t);
   }, [router]);
   const seconds = Math.max(Math.round((now - new Date(since).getTime()) / 1000), 0);
-  const step = STEPS[Math.min(Math.floor(seconds / 15), STEPS.length - 1)];
+  const step = STEPS[Math.min(Math.floor(seconds / 8), STEPS.length - 1)];
   return (
     <div className="card flex flex-col items-center gap-3 p-10 text-center">
       <Loader2 className="size-10 animate-spin text-brand" />
       <p className="text-lg font-semibold">{step}</p>
-      <p className="text-sm text-zinc-500">{seconds} s · suele tardar entre 30 segundos y 2 minutos. Puedes salir y volver luego.</p>
+      <p className="text-sm text-zinc-500">{seconds} s · suele tardar entre 20 segundos y 1 minuto. Puedes salir y volver luego.</p>
     </div>
   );
 }

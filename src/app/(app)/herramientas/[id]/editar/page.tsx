@@ -44,8 +44,8 @@ export default async function EditBenefitPage({
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
-        <Link href="/beneficios" className="mb-4 inline-flex items-center gap-1 text-sm text-zinc-500 hover:text-zinc-900">
-          <ArrowLeft className="size-4" /> Beneficios
+        <Link href="/herramientas" className="mb-4 inline-flex items-center gap-1 text-sm text-zinc-500 hover:text-zinc-900">
+          <ArrowLeft className="size-4" /> Herramientas
         </Link>
         <PageHeader title={benefit.title}>
           <form action={deleteBenefit}>

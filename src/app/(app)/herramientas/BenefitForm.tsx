@@ -9,7 +9,7 @@ export function BenefitForm({ action, benefit }: { action: (formData: FormData) 
     <form action={action} className="card space-y-5 p-6">
       {benefit && <input type="hidden" name="id" value={benefit.id} />}
       <div>
-        <label className="label" htmlFor="title">Nombre del beneficio</label>
+        <label className="label" htmlFor="title">Nombre de la herramienta</label>
         <input id="title" name="title" required defaultValue={benefit?.title} className="input" placeholder="Ej: Google AI Pro · 18 meses" />
       </div>
       <div>
@@ -23,7 +23,11 @@ export function BenefitForm({ action, benefit }: { action: (formData: FormData) 
       <div>
         <label className="label" htmlFor="claim_url">Enlace para activarlo</label>
         <input id="claim_url" name="claim_url" type="url" defaultValue={benefit?.claim_url ?? ""} className="input" placeholder="https://..." />
-        <p className="hint">Se muestra al alumno después de reclamarlo.</p>
+        <p className="hint">Se muestra al alumno después de reclamarlo. Para que te contacten, usa tu enlace de WhatsApp (https://wa.me/...).</p>
+      </div>
+      <div>
+        <label className="label" htmlFor="claim_label">Texto del botón</label>
+        <input id="claim_label" name="claim_label" maxLength={60} defaultValue={benefit?.claim_label ?? ""} className="input" placeholder="Activar mi beneficio" />
       </div>
 
       <fieldset className="space-y-3 rounded-xl border border-zinc-200 p-4">
@@ -61,8 +65,8 @@ export function BenefitForm({ action, benefit }: { action: (formData: FormData) 
       </div>
 
       <div className="flex justify-end gap-2">
-        <Link href="/beneficios" className="btn btn-secondary">Volver</Link>
-        <SubmitButton pendingText="Guardando...">{benefit ? "Guardar cambios" : "Crear beneficio"}</SubmitButton>
+        <Link href="/herramientas" className="btn btn-secondary">Volver</Link>
+        <SubmitButton pendingText="Guardando...">{benefit ? "Guardar cambios" : "Crear herramienta"}</SubmitButton>
       </div>
     </form>
   );

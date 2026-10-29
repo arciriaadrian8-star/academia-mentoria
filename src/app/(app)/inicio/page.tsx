@@ -25,12 +25,12 @@ import { markWelcomeSeen } from "./actions";
 const SHORTCUTS = [
   { href: "/classroom", label: "Classroom", text: "Tus cursos y lecciones", icon: GraduationCap },
   { href: "/sesiones", label: "Sesiones grupales", text: "Estudia y trabaja con otros alumnos", icon: Users },
-  { href: "/herramientas", label: "Herramientas", text: "Calculadoras de rentabilidad y anuncios", icon: Calculator },
+  { href: "/calculadoras", label: "Calculadoras", text: "Rentabilidad, precios y anuncios", icon: Calculator },
   { href: "/plataformas", label: "Plataformas", text: "Dropi, Shopify, IA y más", icon: LayoutGrid },
   { href: "/comunidad", label: "Comunidad", text: "Pregunta, comparte y celebra", icon: MessagesSquare },
   { href: "/calendario", label: "Calendario", text: "Clases y sesiones en vivo", icon: CalendarDays },
   { href: "/ranking", label: "Ranking", text: "Puntos, rangos y medallas", icon: Trophy },
-  { href: "/beneficios", label: "Beneficios", text: "Lo que incluye tu mentoría", icon: Gift },
+  { href: "/herramientas", label: "Herramientas", text: "Google AI Pro, DropKiller, Releasit y más", icon: Gift },
 ];
 
 export default async function HomePage() {
@@ -70,7 +70,7 @@ export default async function HomePage() {
     { done: (postsRes.count ?? 0) > 0, label: "Preséntate en la comunidad", href: "/comunidad" },
     { done: (me?.lessons ?? 0) > 0, label: "Completa tu primera lección", href: "/classroom" },
     ...((benefitsRes.count ?? 0) > 0
-      ? [{ done: (claimsRes.count ?? 0) > 0, label: "Reclama tus beneficios", href: "/beneficios" }]
+      ? [{ done: (claimsRes.count ?? 0) > 0, label: "Reclama tus herramientas", href: "/herramientas" }]
       : []),
     { done: joinedAnySession, label: "Únete a una sesión grupal", href: "/sesiones" },
   ];

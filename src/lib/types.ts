@@ -131,6 +131,7 @@ export interface Benefit {
   description: string | null;
   image_url: string | null;
   claim_url: string | null;
+  claim_label: string | null;
   delivery: "link" | "code";
   active: boolean;
   position: number;

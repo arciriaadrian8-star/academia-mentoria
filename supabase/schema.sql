@@ -809,3 +809,6 @@ select
   '**Cómo activarlo:**' || chr(10) || '1. Pulsa **Reclamar**.' || chr(10) || '2. Sigue el enlace o usa tu código.' || chr(10) || '3. Inicia sesión con tu cuenta de Google y confirma.',
   'link', false, 1
 where not exists (select 1 from public.benefits);
+
+-- Texto personalizado del botón de una herramienta
+alter table public.benefits add column if not exists claim_label text check (char_length(claim_label) <= 60);

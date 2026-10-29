@@ -23,10 +23,10 @@ export function Header({
     { href: "/classroom", label: "Classroom" },
     { href: "/calendario", label: "Calendario" },
     { href: "/sesiones", label: "Sesiones" },
-    { href: "/herramientas", label: "Herramientas" },
+    { href: "/calculadoras", label: "Calculadoras" },
     { href: "/plataformas", label: "Plataformas" },
     { href: "/ranking", label: "Ranking" },
-    { href: "/beneficios", label: "Beneficios" },
+    { href: "/herramientas", label: "Herramientas" },
     ...(isAdmin ? [{ href: "/miembros", label: "Miembros", badge: pendingCount }, { href: "/ajustes", label: "Ajustes" }] : []),
   ];
 

@@ -9,10 +9,10 @@ export async function claimBenefit(formData: FormData) {
   const { supabase } = await requireActive();
   const id = str(formData, "id");
   const { error } = await supabase.rpc("claim_benefit", { bid: id });
-  revalidatePath("/beneficios");
+  revalidatePath("/herramientas");
   revalidatePath("/inicio");
-  if (error) redirect(`/beneficios?error=${encodeURIComponent(error.message)}#b-${id}`);
-  redirect(`/beneficios?reclamado=${id}#b-${id}`);
+  if (error) redirect(`/herramientas?error=${encodeURIComponent(error.message)}#b-${id}`);
+  redirect(`/herramientas?reclamado=${id}#b-${id}`);
 }
 
 function payload(formData: FormData) {
@@ -21,6 +21,7 @@ function payload(formData: FormData) {
     description: strOrNull(formData, "description"),
     image_url: safeUrl(strOrNull(formData, "image_url")),
     claim_url: safeUrl(strOrNull(formData, "claim_url")),
+    claim_label: strOrNull(formData, "claim_label"),
     delivery: str(formData, "delivery") === "code" ? "code" : "link",
     active: formData.get("active") === "on",
     position: parseInt(str(formData, "position"), 10) || 0,
@@ -42,8 +43,8 @@ export async function createBenefit(formData: FormData) {
   const { data, error } = await supabase.from("benefits").insert(payload(formData)).select("id").single();
   if (error) throw error;
   await addCodes(supabase, data.id, str(formData, "codes"));
-  revalidatePath("/beneficios");
-  redirect(`/beneficios/${data.id}/editar?guardado=1`);
+  revalidatePath("/herramientas");
+  redirect(`/herramientas/${data.id}/editar?guardado=1`);
 }
 
 export async function updateBenefit(formData: FormData) {
@@ -52,21 +53,21 @@ export async function updateBenefit(formData: FormData) {
   const { error } = await supabase.from("benefits").update(payload(formData)).eq("id", id);
   if (error) throw error;
   await addCodes(supabase, id, str(formData, "codes"));
-  revalidatePath("/beneficios");
-  redirect(`/beneficios/${id}/editar?guardado=1`);
+  revalidatePath("/herramientas");
+  redirect(`/herramientas/${id}/editar?guardado=1`);
 }
 
 export async function deleteBenefit(formData: FormData) {
   const { supabase } = await requireAdmin();
   await supabase.from("benefits").delete().eq("id", str(formData, "id"));
-  revalidatePath("/beneficios");
-  redirect("/beneficios");
+  revalidatePath("/herramientas");
+  redirect("/herramientas");
 }
 
 export async function deleteFreeCodes(formData: FormData) {
   const { supabase } = await requireAdmin();
   const id = str(formData, "id");
   await supabase.from("benefit_codes").delete().eq("benefit_id", id).is("assigned_to", null);
-  revalidatePath("/beneficios");
-  redirect(`/beneficios/${id}/editar`);
+  revalidatePath("/herramientas");
+  redirect(`/herramientas/${id}/editar`);
 }

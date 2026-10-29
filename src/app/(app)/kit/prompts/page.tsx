@@ -15,6 +15,12 @@ export default async function PromptsPage() {
         title="Generador de prompts y guiones"
         description="Cambia el producto y el ángulo: te armo ganchos, textos, imágenes, página de producto y guiones de video con IA (UGC, esqueleto, historia animada y más)."
       />
+      <Link href="/kit/video-ia" className="card mb-6 flex items-center gap-3 border-brand/30 bg-brand/5 p-4 text-sm transition hover:shadow-md">
+        <span className="text-xl">🪄</span>
+        <span>
+          <strong>¿Tienes un video ganador de referencia?</strong> Súbelo a <span className="font-semibold text-brand">Guion IA</span> y la IA te escribe un guion a la medida de tu producto.
+        </span>
+      </Link>
       <PromptGenerator />
     </>
   );

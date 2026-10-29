@@ -70,3 +70,15 @@ export function weekStart(d = new Date()) {
   date.setUTCDate(date.getUTCDate() - day + 1);
   return date.toISOString().slice(0, 10);
 }
+
+/** Formatos de video para el guion IA. */
+export const VIDEO_FORMATS = [
+  { id: "mismo", label: "El mismo formato del video" },
+  { id: "ugc", label: "UGC con presentador IA" },
+  { id: "demo", label: "Problema → solución" },
+  { id: "antes_despues", label: "Antes y después" },
+  { id: "esqueleto", label: "Esqueleto educativo" },
+  { id: "animado", label: "Historia animada 3D" },
+  { id: "objeto", label: "El producto que habla" },
+  { id: "pov", label: "POV / unboxing" },
+] as const;

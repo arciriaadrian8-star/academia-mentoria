@@ -9,6 +9,7 @@ import {
   Route,
   ScanSearch,
   Sparkles,
+  Wand2,
   Trophy,
 } from "lucide-react";
 import { requireActive } from "@/lib/auth";
@@ -16,6 +17,13 @@ import { ROADMAP_KEYS } from "@/lib/roadmap";
 import { PageHeader } from "@/components/PageHeader";
 
 const TOOLS = [
+  {
+    href: "/kit/video-ia",
+    title: "Guion IA desde un video ganador",
+    text: "Sube un anuncio que vende: la IA lo ve, te explica por qué funciona y te escribe tu guion con prompts para Flow / Veo.",
+    icon: Wand2,
+    tag: "IA en vivo",
+  },
   {
     href: "/kit/campanas",
     title: "Analizador de campañas",

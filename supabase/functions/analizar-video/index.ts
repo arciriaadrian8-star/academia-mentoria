@@ -3,7 +3,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const GEMINI = "https://generativelanguage.googleapis.com";
-const KEY = Deno.env.get("GEMINI_API_KEY") ?? "";
+const key = () => (Deno.env.get("GEMINI_API_KEY") ?? Deno.env.get("GEMINI_KEY") ?? Deno.env.get("GOOGLE_API_KEY") ?? "").trim();
 const MODELS = [Deno.env.get("GEMINI_MODEL"), "gemini-2.5-flash", "gemini-flash-latest"].filter(Boolean) as string[];
 const DAILY_LIMIT = 5;
 
@@ -121,7 +121,7 @@ Responde SOLO con el JSON del esquema.`;
 }
 
 async function gemini(path: string, init: RequestInit) {
-  const url = `${GEMINI}${path}${path.includes("?") ? "&" : "?"}key=${KEY}`;
+  const url = `${GEMINI}${path}${path.includes("?") ? "&" : "?"}key=${key()}`;
   return fetch(url, init);
 }
 
@@ -187,7 +187,7 @@ async function process(id: string) {
   if (!row) return;
   let geminiFile: string | null = null;
   try {
-    if (!KEY) throw new Error("Falta configurar GEMINI_API_KEY en los secretos de Supabase.");
+    if (!key()) throw new Error("Falta configurar GEMINI_API_KEY en los secretos de Supabase.");
     if (!row.video_path) throw new Error("No se encontró el video.");
     const { data: blob, error } = await admin.storage.from("ai-videos").download(row.video_path);
     if (error || !blob) throw new Error("No se pudo leer el video subido.");

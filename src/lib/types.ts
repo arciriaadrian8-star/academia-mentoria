@@ -11,6 +11,8 @@ export interface Profile {
   /** Se registró solo y está esperando que el admin le dé acceso. */
   pending: boolean;
   created_at: string;
+  /** Cuándo marcó que vio el vídeo de inducción. */
+  welcome_seen_at?: string | null;
 }
 
 export interface AccessLevel {
@@ -97,4 +99,54 @@ export interface Credentials {
   password?: string;
   loginUrl?: string;
   academy?: string;
+}
+
+export interface Platform {
+  id: string;
+  name: string;
+  description: string | null;
+  url: string;
+  category: string;
+  logo_url: string | null;
+  tutorial_url: string | null;
+  perk: string | null;
+  position: number;
+}
+
+export interface StudySession {
+  id: string;
+  host_id: string;
+  title: string;
+  description: string | null;
+  topic: string;
+  starts_at: string;
+  duration_minutes: number;
+  meet_url: string;
+  max_attendees: number | null;
+}
+
+export interface Benefit {
+  id: string;
+  title: string;
+  description: string | null;
+  image_url: string | null;
+  claim_url: string | null;
+  claim_label: string | null;
+  delivery: "link" | "code";
+  active: boolean;
+  position: number;
+}
+
+export interface LeaderboardRow {
+  id: string;
+  full_name: string;
+  avatar_url: string | null;
+  role: Role;
+  lessons: number;
+  posts: number;
+  comments: number;
+  likes: number;
+  hosted: number;
+  joined: number;
+  points: number;
 }

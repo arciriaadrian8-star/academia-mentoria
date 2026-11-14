@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { Profile, Settings } from "@/lib/types";
 
 /** Columnas visibles para los usuarios (el email solo lo lee el servidor). */
-export const PROFILE_COLUMNS = "id, full_name, avatar_url, bio, role, active, pending, created_at, welcome_seen_at";
+export const PROFILE_COLUMNS = "id, full_name, avatar_url, bio, role, active, pending, created_at, welcome_seen_at, access_until";
 
 export const getSession = cache(async () => {
   const supabase = await createClient();
@@ -18,13 +18,30 @@ export const getSession = cache(async () => {
   return { supabase, user, profile };
 });
 
-/** Usuario con sesión y cuenta activa. */
-export async function requireActive() {
+/** ¿Es una cuenta «Solo Kit» cuyo acceso ya venció? */
+export function isKitExpired(profile: Pick<Profile, "role" | "access_until">) {
+  return profile.role === "kit" && Boolean(profile.access_until) && new Date(profile.access_until!).getTime() <= Date.now();
+}
+
+/**
+ * Usuario con acceso a las herramientas del Kit COD: miembros de la academia
+ * y cuentas «Solo Kit» con el acceso vigente.
+ */
+export async function requireKit() {
   const { supabase, user, profile } = await getSession();
   if (!user || !profile) redirect("/login");
   if (!profile.active) redirect("/pendiente");
+  const isKitOnly = profile.role === "kit";
+  if (isKitOnly && isKitExpired(profile)) redirect("/acceso-vencido");
   const isStaff = profile.role === "admin" || profile.role === "coach";
-  return { supabase, user, profile, isStaff, isAdmin: profile.role === "admin" };
+  return { supabase, user, profile, isStaff, isAdmin: profile.role === "admin", isKitOnly };
+}
+
+/** Usuario con sesión y acceso a la academia completa. Las cuentas «Solo Kit» se mandan al Kit. */
+export async function requireActive() {
+  const session = await requireKit();
+  if (session.isKitOnly) redirect("/kit");
+  return session;
 }
 
 /** Admin o coach. */

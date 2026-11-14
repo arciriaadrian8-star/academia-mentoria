@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, CalendarPlus, Trash2 } from "lucide-react";
 import { requireAdmin } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { toDateInput } from "@/lib/accessCodes";
 import { ROLE_DESCRIPTIONS, ROLE_LABELS } from "@/lib/constants";
 import type { AccessLevel, Course, Profile, Role } from "@/lib/types";
 import { Avatar } from "@/components/Avatar";
@@ -47,7 +48,10 @@ export default async function MemberPage({
     .filter((c) => c.published)
     .map((course) => {
       const levelIds = (courseAccessRes.data ?? []).filter((ca) => ca.course_id === course.id).map((ca) => ca.access_level_id);
-      const hasAccess = member.role !== "member" || levelIds.length === 0 || levelIds.some((l) => memberLevels.includes(l));
+      const hasAccess =
+        member.role === "admin" ||
+        member.role === "coach" ||
+        (member.role === "member" && (levelIds.length === 0 || levelIds.some((l) => memberLevels.includes(l))));
       const courseLessons = lessons.filter((l) => l.course_id === course.id);
       const completed = courseLessons.filter((l) => done.has(l.id)).length;
       return { course, hasAccess, total: courseLessons.length, completed };
@@ -82,10 +86,21 @@ export default async function MemberPage({
           <div>
             <label className="label" htmlFor="role">Rol</label>
             <select id="role" name="role" defaultValue={member.role} disabled={isSelf} className="input">
-              {(["member", "coach", "admin"] as Role[]).map((role) => (
+              {(["member", "kit", "coach", "admin"] as Role[]).map((role) => (
                 <option key={role} value={role}>{ROLE_LABELS[role]} — {ROLE_DESCRIPTIONS[role]}</option>
               ))}
             </select>
+          </div>
+          <div>
+            <label className="label" htmlFor="access_until">Acceso al Kit hasta (solo cuentas «Solo Kit»)</label>
+            <input
+              id="access_until"
+              name="access_until"
+              type="date"
+              defaultValue={toDateInput(member.access_until)}
+              className="input"
+            />
+            <p className="mt-1 text-xs text-zinc-500">Vacío = sin vencimiento. Al canjear un código nuevo se suman sus días.</p>
           </div>
           <div>
             <span className="label">Niveles de acceso</span>

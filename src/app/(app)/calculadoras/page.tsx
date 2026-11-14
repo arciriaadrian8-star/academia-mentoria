@@ -1,9 +1,9 @@
-import { requireActive } from "@/lib/auth";
+import { requireKit } from "@/lib/auth";
 import { PageHeader } from "@/components/PageHeader";
 import { Calculators } from "./Calculators";
 
 export default async function ToolsPage() {
-  await requireActive();
+  await requireKit();
   return (
     <>
       <PageHeader

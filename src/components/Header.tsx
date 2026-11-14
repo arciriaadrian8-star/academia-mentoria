@@ -9,15 +9,18 @@ export function Header({
   profile,
   isStaff,
   isAdmin,
+  isKitOnly = false,
   pendingCount = 0,
 }: {
   settings: Settings;
   profile: Profile;
   isStaff: boolean;
   isAdmin: boolean;
+  /** Cuenta «Solo Kit»: solo ve las herramientas del Kit COD. */
+  isKitOnly?: boolean;
   pendingCount?: number;
 }) {
-  const tabs = [
+  const tabs = isKitOnly ? [{ href: "/kit", label: "Kit COD" }, { href: "/calculadoras", label: "Calculadoras" }] : [
     { href: "/inicio", label: "Inicio" },
     { href: "/comunidad", label: "Comunidad" },
     { href: "/classroom", label: "Classroom" },
@@ -33,7 +36,7 @@ export function Header({
   return (
     <header className="sticky top-0 z-30 border-b border-zinc-200 bg-white/95 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 pt-3">
-        <Link href="/" className="flex min-w-0 items-center gap-3">
+        <Link href={isKitOnly ? "/kit" : "/"} className="flex min-w-0 items-center gap-3">
           {settings.logo_url ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={settings.logo_url} alt="" className="size-9 rounded-lg object-cover" />
@@ -49,7 +52,8 @@ export function Header({
           name={profile.full_name}
           email={profile.email}
           avatarUrl={profile.avatar_url}
-          roleLabel={isStaff ? ROLE_LABELS[profile.role] : undefined}
+          roleLabel={isStaff || isKitOnly ? ROLE_LABELS[profile.role] : undefined}
+          showProfile={!isKitOnly}
         />
       </div>
       <div className="mx-auto max-w-6xl px-4">

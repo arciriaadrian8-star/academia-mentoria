@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Clapperboard, Lightbulb, Search, Trash2 } from "lucide-react";
-import { requireActive } from "@/lib/auth";
+import { requireKit } from "@/lib/auth";
 import { VIDEO_FORMATS } from "@/lib/kit";
 import { ConfirmButton } from "@/components/ConfirmButton";
 import { CopyButton } from "@/components/CopyButton";
@@ -45,7 +45,7 @@ type Result = {
 
 export default async function ScriptPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { supabase } = await requireActive();
+  const { supabase } = await requireKit();
   const { data: row } = await supabase.from("ai_scripts").select("*").eq("id", id).maybeSingle();
   if (!row) notFound();
 

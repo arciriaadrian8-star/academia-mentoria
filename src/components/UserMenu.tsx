@@ -11,11 +11,13 @@ export function UserMenu({
   email,
   avatarUrl,
   roleLabel,
+  showProfile = true,
 }: {
   name: string;
   email: string;
   avatarUrl: string | null;
   roleLabel?: string;
+  showProfile?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -41,9 +43,11 @@ export function UserMenu({
             <p className="truncate text-xs text-zinc-500">{email}</p>
             {roleLabel && <span className="chip mt-2 bg-brand/10 text-brand">{roleLabel}</span>}
           </div>
-          <Link href="/perfil" onClick={() => setOpen(false)} className="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-zinc-50">
-            <UserRound className="size-4" /> Mi perfil
-          </Link>
+          {showProfile && (
+            <Link href="/perfil" onClick={() => setOpen(false)} className="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-zinc-50">
+              <UserRound className="size-4" /> Mi perfil
+            </Link>
+          )}
           <form action={signOut}>
             <button className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50">
               <LogOut className="size-4" /> Cerrar sesión

@@ -1,8 +1,9 @@
-import { getSettings, requireActive } from "@/lib/auth";
+import { getSettings, requireKit } from "@/lib/auth";
 import { Header } from "@/components/Header";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const { supabase, profile, isStaff, isAdmin } = await requireActive();
+  // Las páginas comprueban su propio acceso; aquí basta con que pueda usar el Kit.
+  const { supabase, profile, isStaff, isAdmin, isKitOnly } = await requireKit();
   const settings = await getSettings();
   const pendingCount = isAdmin
     ? ((await supabase.from("profiles").select("id", { count: "exact", head: true }).eq("pending", true)).count ?? 0)
@@ -10,7 +11,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="min-h-screen">
-      <Header settings={settings} profile={profile} isStaff={isStaff} isAdmin={isAdmin} pendingCount={pendingCount} />
+      <Header settings={settings} profile={profile} isStaff={isStaff} isAdmin={isAdmin} isKitOnly={isKitOnly} pendingCount={pendingCount} />
       <main className="mx-auto max-w-6xl px-4 py-6 sm:py-8">{children}</main>
     </div>
   );

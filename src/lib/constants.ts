@@ -4,12 +4,14 @@ export const ROLE_LABELS: Record<Role, string> = {
   admin: "Admin",
   coach: "Coach",
   member: "Miembro",
+  kit: "Solo Kit",
 };
 
 export const ROLE_DESCRIPTIONS: Record<Role, string> = {
   admin: "Control total: contenido, calendario, miembros y ajustes.",
   coach: "Puede crear cursos, lecciones y eventos y moderar la comunidad.",
   member: "Ve el contenido de sus niveles de acceso y participa en la comunidad.",
+  kit: "Solo entra a las herramientas del Kit COD (acceso con código). No ve cursos ni comunidad.",
 };
 
 export const POST_CATEGORIES = [

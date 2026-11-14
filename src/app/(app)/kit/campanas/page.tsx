@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { requireActive } from "@/lib/auth";
+import { requireKit } from "@/lib/auth";
 import { PageHeader } from "@/components/PageHeader";
 import { CampaignAnalyzer } from "./CampaignAnalyzer";
 
 export default async function CampaignsPage() {
-  await requireActive();
+  await requireKit();
   return (
     <>
       <Link href="/kit" className="mb-4 inline-flex items-center gap-1 text-sm text-zinc-500 hover:text-zinc-900">

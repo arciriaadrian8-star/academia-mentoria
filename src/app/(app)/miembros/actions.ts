@@ -11,6 +11,15 @@ import type { Credentials, Role } from "@/lib/types";
 import { str } from "@/lib/utils";
 
 const ROLES: Role[] = ["admin", "coach", "member"];
+/** Roles que el admin puede poner desde la ficha del miembro («Solo Kit» se crea con códigos). */
+const EDITABLE_ROLES: Role[] = [...ROLES, "kit"];
+
+/** Fecha del formulario (YYYY-MM-DD) → fin de ese día en hora de Colombia/Perú/Ecuador (UTC-5). */
+function endOfDay(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const date = new Date(`${value}T23:59:59-05:00`);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
 
 function generatePassword() {
   const alphabet = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -64,7 +73,10 @@ export async function updateMember(formData: FormData) {
   // Un admin no puede quitarse permisos a sí mismo por accidente.
   if (id !== user.id) {
     const role = str(formData, "role") as Role;
-    if (ROLES.includes(role)) update.role = role;
+    if (EDITABLE_ROLES.includes(role)) {
+      update.role = role;
+      update.access_until = role === "kit" ? endOfDay(str(formData, "access_until")) : null;
+    }
     update.active = formData.get("active") === "on";
     if (update.active) update.pending = false;
   }

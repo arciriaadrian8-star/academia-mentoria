@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireActive } from "@/lib/auth";
+import { requireKit } from "@/lib/auth";
 import { COUNTRIES, VIDEO_FORMATS } from "@/lib/kit";
 import { str, strOrNull } from "@/lib/utils";
 
@@ -10,7 +10,7 @@ import { str, strOrNull } from "@/lib/utils";
 export type ScriptState = { error?: string } | null;
 
 export async function createScript(_prev: ScriptState, formData: FormData): Promise<ScriptState> {
-  const { supabase, user, isStaff } = await requireActive();
+  const { supabase, user, isStaff } = await requireKit();
   const product = str(formData, "product");
   const description = str(formData, "description");
   const videoPath = str(formData, "video_path");
@@ -53,7 +53,7 @@ export async function createScript(_prev: ScriptState, formData: FormData): Prom
 }
 
 export async function deleteScript(formData: FormData) {
-  const { supabase } = await requireActive();
+  const { supabase } = await requireKit();
   await supabase.from("ai_scripts").delete().eq("id", str(formData, "id"));
   revalidatePath("/kit/video-ia");
   redirect("/kit/video-ia");

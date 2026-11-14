@@ -1,4 +1,4 @@
-export type Role = "admin" | "coach" | "member";
+export type Role = "admin" | "coach" | "member" | "kit";
 
 export interface Profile {
   id: string;
@@ -13,6 +13,8 @@ export interface Profile {
   created_at: string;
   /** Cuándo marcó que vio el vídeo de inducción. */
   welcome_seen_at?: string | null;
+  /** Cuentas «Solo Kit»: cuándo vence su acceso (null = sin vencimiento). */
+  access_until?: string | null;
 }
 
 export interface AccessLevel {

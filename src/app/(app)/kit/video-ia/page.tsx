@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { ArrowLeft, CheckCircle2, Clock, XCircle } from "lucide-react";
-import { requireActive } from "@/lib/auth";
+import { requireKit } from "@/lib/auth";
 import { timeAgo } from "@/lib/utils";
 import { EmptyState, PageHeader } from "@/components/PageHeader";
 import { VideoScriptForm } from "./VideoScriptForm";
 
 export default async function VideoAIPage() {
-  const { supabase, user } = await requireActive();
+  const { supabase, user } = await requireKit();
   const { data } = await supabase
     .from("ai_scripts")
     .select("id, product, format, status, created_at")

@@ -317,9 +317,12 @@ Deno.serve(async (req) => {
   if (row.status !== "procesando" || row.result) return json({ ok: true, status: row.status });
 
   const admin = adminClient();
-  const { data: profile } = await admin.from("profiles").select("role, active").eq("id", user.id).single();
+  const { data: profile } = await admin.from("profiles").select("role, active, access_until").eq("id", user.id).single();
   if (!profile?.active) return json({ error: "Cuenta inactiva" }, 403);
-  if (profile.role === "student") {
+  if (profile.role === "kit" && profile.access_until && new Date(profile.access_until).getTime() <= Date.now()) {
+    return json({ error: "Acceso vencido" }, 403);
+  }
+  if (profile.role !== "admin" && profile.role !== "coach") {
     const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
     const { count } = await admin.from("ai_scripts").select("id", { count: "exact", head: true }).eq("user_id", user.id).gte("created_at", since);
     if ((count ?? 0) > DAILY_LIMIT) {

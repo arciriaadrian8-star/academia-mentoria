@@ -43,6 +43,12 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           </Link>
         </p>
       )}
+      <p className="mt-3 text-center text-sm text-zinc-500">
+        ¿Tienes un código del Kit COD?{" "}
+        <Link href="/kit-acceso" className="font-semibold text-brand hover:underline">
+          Actívalo aquí
+        </Link>
+      </p>
     </AuthCard>
   );
 }

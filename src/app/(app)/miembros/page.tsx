@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { Layers, Plus, Search, Users } from "lucide-react";
-import { requireAdmin } from "@/lib/auth";
+import { KeyRound, Layers, Plus, Search, Users } from "lucide-react";
+import { isKitExpired, requireAdmin } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ROLE_LABELS } from "@/lib/constants";
 import type { AccessLevel, Profile } from "@/lib/types";
@@ -36,6 +36,9 @@ export default async function MembersPage({ searchParams }: { searchParams: Prom
   return (
     <>
       <PageHeader title="Miembros" description="Da acceso a tus alumnos y decide qué contenido ve cada uno.">
+        <Link href="/miembros/codigos" className="btn btn-secondary">
+          <KeyRound className="size-4" /> Códigos Kit COD
+        </Link>
         <Link href="/miembros/niveles" className="btn btn-secondary">
           <Layers className="size-4" /> Niveles de acceso
         </Link>
@@ -92,10 +95,18 @@ export default async function MembersPage({ searchParams }: { searchParams: Prom
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <LevelChips levels={levelsOf(m.id)} emptyText={m.role === "member" ? "Sin nivel" : undefined} />
+                    {m.role === "kit" ? (
+                      <span className="text-xs text-zinc-500">
+                        {m.access_until ? `Hasta ${new Date(m.access_until).toLocaleDateString("es", { day: "numeric", month: "short", year: "numeric" })}` : "Sin vencimiento"}
+                      </span>
+                    ) : (
+                      <LevelChips levels={levelsOf(m.id)} emptyText={m.role === "member" ? "Sin nivel" : undefined} />
+                    )}
                   </td>
                   <td className="px-4 py-3">
-                    {m.active ? (
+                    {m.active && isKitExpired(m) ? (
+                      <span className="chip bg-amber-100 text-amber-800">Vencido</span>
+                    ) : m.active ? (
                       <span className="chip bg-emerald-100 text-emerald-800">Activo</span>
                     ) : (
                       <span className="chip bg-red-100 text-red-700">Sin acceso</span>

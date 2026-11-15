@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession, getSettings } from "@/lib/auth";
 import { signOut } from "../actions";
@@ -15,7 +16,8 @@ export default async function PendingPage() {
           ? "Tu cuenta está pendiente de aprobación. En cuanto tu mentor te dé acceso, podrás entrar con tu email o con Google."
           : "Tu cuenta ha sido desactivada. Contacta con tu mentor para recuperar el acceso."}
       </p>
-      <form action={signOut} className="mt-6">
+      <Link href="/membresia" className="btn btn-primary mt-6 w-full">Activar mi acceso pagando con Nequi</Link>
+      <form action={signOut} className="mt-3">
         <button className="btn btn-secondary w-full">Cerrar sesión</button>
       </form>
     </AuthCard>

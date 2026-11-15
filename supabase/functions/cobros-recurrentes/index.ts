@@ -19,7 +19,7 @@ Deno.serve(async (req) => {
 
   const { data: due } = await db
     .from("subscriptions")
-    .select("id, user_id, customer_email, payment_source_id, payment_method, failed_attempts, membership_plans(price_cop, active)")
+    .select("id, user_id, customer_email, payment_source_id, payment_method, failed_attempts")
     .in("status", ["activa", "en_mora"])
     .eq("cancel_at_period_end", false)
     .lte("next_charge_at", new Date().toISOString())
@@ -34,10 +34,8 @@ Deno.serve(async (req) => {
     const { count } = await db.from("subscription_payments").select("id", { count: "exact", head: true })
       .eq("subscription_id", s.id).eq("status", "PENDING").gt("created_at", new Date(Date.now() - 86_400_000).toISOString());
     if (count) continue;
-    const plan = (s as any).membership_plans as { price_cop: number } | null;
-    if (!plan) continue;
     try {
-      await chargeSubscription(db, s as any, plan.price_cop);
+      await chargeSubscription(db, s as any);
       charged++;
     } catch (e) {
       console.error("cobro", s.id, (e as Error).message);

@@ -18,7 +18,14 @@ async function errorMessage(error: unknown) {
   return "No pudimos conectar con Nequi. Intenta de nuevo.";
 }
 
-export function NequiCheckout({ planId, resumePending = false }: { planId: string; resumePending?: boolean }) {
+export type Guest = { email: string; name: string } | null;
+
+export function NequiCheckout({ planId, resumePending = false, discountCode, guest = null, getGuest, checkoutToken, onToken, onDone }: {
+  planId: string; resumePending?: boolean; discountCode?: string; guest?: Guest;
+  /** Valida y devuelve los datos del invitado (o un error) justo antes de pagar. */
+  getGuest?: () => Guest | string;
+  checkoutToken?: string | null; onToken?: (t: string) => void; onDone?: () => void;
+}) {
   const router = useRouter();
   const supabase = useRef(createClient()).current;
   const [phase, setPhase] = useState<Phase>(resumePending ? "waiting" : "form");
@@ -27,17 +34,18 @@ export function NequiCheckout({ planId, resumePending = false }: { planId: strin
   const [busy, setBusy] = useState(false);
 
   const check = useCallback(async () => {
-    const { data, error } = await supabase.functions.invoke("nequi-suscripcion", { body: { action: "estado" } });
+    const { data, error } = await supabase.functions.invoke("nequi-suscripcion", { body: { action: "estado", checkout_token: checkoutToken } });
     if (error) return;
     if (data?.status === "activa") {
       setPhase("done");
+      onDone?.();
       router.refresh();
     } else if (data?.status === "fallida") {
       setPhase("form");
       setError(data.last_error ? `No se completó: ${data.last_error}` : "No se completó el pago. Intenta de nuevo.");
       router.refresh();
     }
-  }, [supabase, router]);
+  }, [supabase, router, checkoutToken, onDone]);
 
   // Mientras espera la aprobación en Nequi, revisa cada 4 segundos (máx. 10 minutos).
   useEffect(() => {
@@ -59,17 +67,20 @@ export function NequiCheckout({ planId, resumePending = false }: { planId: strin
   async function start(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    const g = getGuest ? getGuest() : guest;
+    if (typeof g === "string") return setError(g);
     setBusy(true);
-    const { error } = await supabase.functions.invoke("nequi-suscripcion", {
-      body: { action: "iniciar", plan_id: planId, phone },
+    const { data, error } = await supabase.functions.invoke("nequi-suscripcion", {
+      body: { action: "iniciar", plan_id: planId, phone, discount_code: discountCode, customer_email: g?.email, full_name: g?.name },
     });
     setBusy(false);
     if (error) return setError(await errorMessage(error));
+    if (data?.checkout_token) onToken?.(String(data.checkout_token));
     setPhase("waiting");
   }
 
   if (phase === "done") {
-    return <FormMessage success="¡Listo! Tu membresía está activa. Ya puedes entrar a la academia." />;
+    return <FormMessage success="¡Pago aprobado! Tu membresía de MakeDrop IA está activa." />;
   }
 
   if (phase === "waiting" || phase === "charging") {

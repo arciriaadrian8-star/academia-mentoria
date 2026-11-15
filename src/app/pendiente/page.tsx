@@ -8,6 +8,8 @@ export default async function PendingPage() {
   const { profile } = await getSession();
   if (!profile) redirect("/login");
   if (profile.active) redirect("/");
+  // Cuentas de MakeDrop IA que aún no pagan: van directo a la página de pago.
+  if (profile.role === "kit") redirect("/membresia");
   const settings = await getSettings();
   return (
     <AuthCard settings={settings} title={profile.pending ? "¡Solicitud recibida! 🙌" : "Cuenta sin acceso"}>

@@ -134,12 +134,45 @@ export async function getTransaction(id: string) {
 
 const FINAL = ["APPROVED", "DECLINED", "VOIDED", "ERROR"];
 
+/** Cuánto se cobra hoy a una suscripción (precio del plan con el descuento que le quede). */
+export async function chargeAmount(db: SupabaseClient, subscriptionId: string) {
+  const { data, error } = await db.rpc("subscription_charge_amount", { p_sub: subscriptionId });
+  if (error || !data) throw error ?? new Error("Sin precio");
+  return Number(data);
+}
+
+const CODE_ERRORS: Record<string, string> = {
+  no_existe: "Ese código no existe o ya no está activo.",
+  vencido: "Ese código ya venció.",
+  agotado: "Ese código ya se agotó.",
+  otro_plan: "Ese código no aplica para este plan.",
+  plan_invalido: "Ese plan no está disponible.",
+};
+
+export type DiscountCheck =
+  | { valid: true; code: string; kind: string; value: number; remaining: number; first_price: number; regular_price: number; duration: string; duration_months: number | null }
+  | { valid: false; error: string };
+
+/** Valida un código de descuento contra un plan (todo se decide en la base de datos). */
+export async function checkDiscount(db: SupabaseClient, code: string, planId: string): Promise<DiscountCheck> {
+  const clean = code.trim().toUpperCase();
+  const { data, error } = await db.rpc("validate_discount_code", { p_code: clean, p_plan: planId });
+  const r = Array.isArray(data) ? data[0] : data;
+  if (error || !r) return { valid: false, error: "No pudimos revisar el código. Intenta de nuevo." };
+  if (!r.valid) return { valid: false, error: CODE_ERRORS[r.reason] ?? "Ese código no sirve." };
+  const remaining = r.duration === "forever" ? -1 : r.duration === "months" ? Number(r.duration_months) : 1;
+  return {
+    valid: true, code: clean, kind: r.kind, value: r.value, remaining, first_price: r.first_price, regular_price: r.regular_price,
+    duration: r.duration, duration_months: r.duration_months,
+  };
+}
+
 /** Crea el registro del cobro, lanza la transacción en Wompi y aplica el resultado si ya es final. */
 export async function chargeSubscription(
   db: SupabaseClient,
   sub: { id: string; user_id: string; customer_email: string; payment_source_id: string; payment_method?: string | null },
-  priceCop: number,
 ) {
+  const priceCop = await chargeAmount(db, sub.id);
   const reference = `MEM-${sub.id.slice(0, 8)}-${Date.now()}`;
   const amount = priceCop * 100;
   const { error } = await db.from("subscription_payments").insert({
@@ -250,6 +283,5 @@ export async function finalizeSubscription(db: SupabaseClient, subscriptionId: s
     throw e;
   }
   await db.from("subscriptions").update({ payment_source_id: sourceId }).eq("id", claimed.id);
-  const { data: plan } = await db.from("membership_plans").select("price_cop").eq("id", claimed.plan_id).single();
-  await chargeSubscription(db, { ...claimed, payment_source_id: sourceId }, plan!.price_cop);
+  await chargeSubscription(db, { ...claimed, payment_source_id: sourceId });
 }

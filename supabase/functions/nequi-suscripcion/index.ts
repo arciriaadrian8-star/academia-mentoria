@@ -1,13 +1,17 @@
-// Suscripción con Nequi desde la página /membresia. POST con el JWT del alumno.
-//   { action: "iniciar", plan_id, phone }  → pide a Nequi la autorización de débito automático
-//   { action: "estado" }                   → revisa si ya aprobó en Nequi y, si sí, hace el primer cobro
-//   { action: "reactivar" }                → deshace una cancelación antes de que termine el periodo
-//   { action: "config" }                   → llave pública de Wompi (para tokenizar la tarjeta en el navegador)
-//   { action: "iniciar_tarjeta", plan_id, card_token, source_token, ... } → primer cobro con 3D Secure
-//   { action: "estado_tarjeta", transaction_id } → estado del primer cobro y reto 3D Secure del banco (si lo hay)
+// Pagos de la membresía (MakeDrop IA) desde la página /membresia. No exige iniciar sesión:
+// si no hay sesión, la cuenta «Solo Kit» se crea sola con el correo y la página sigue el pago con un
+// checkout_token secreto que se devuelve al iniciar.
+//   { action: "config" }                                   → llave pública de Wompi (tokenizar la tarjeta en el navegador)
+//   { action: "validar_codigo", plan_id, discount_code }   → revisa un código de descuento y devuelve el precio final
+//   { action: "iniciar", plan_id, phone, [customer_email, full_name], [discount_code] } → autorización Nequi
+//   { action: "iniciar_tarjeta", plan_id, card_token, source_token, ... }               → primer cobro con 3D Secure
+//   { action: "estado", [checkout_token] }                 → revisa Nequi / cobros y devuelve el estado
+//   { action: "estado_tarjeta", transaction_id, [checkout_token] } → estado del primer cobro y reto 3D Secure
+//   { action: "skool_email", email, [checkout_token] }     → guarda el correo de Skool para que el admin lo invite
+//   { action: "reactivar" }                                → deshace una cancelación (requiere sesión)
 import {
-  adminClient, applyPayment, cors, createCard3dsTransaction, createNequiToken, finalizeSubscription, getNequiTokenStatus,
-  getTransactionDetail, json, publicKey, syncPendingPayments, wompiConfigured,
+  adminClient, applyPayment, chargeAmount, checkDiscount, cors, createCard3dsTransaction, createNequiToken, finalizeSubscription,
+  getNequiTokenStatus, getTransactionDetail, json, publicKey, syncPendingPayments, wompiConfigured,
 } from "../_shared/wompi.ts";
 
 Deno.serve(async (req) => {
@@ -16,19 +20,61 @@ Deno.serve(async (req) => {
   if (!wompiConfigured()) return json({ error: "Los pagos con Nequi aún no están activos. Escríbele a tu mentor." }, 503);
 
   const db = adminClient();
-  const jwt = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
-  const { data: auth } = await db.auth.getUser(jwt);
-  const user = auth?.user;
-  if (!user) return json({ error: "Inicia sesión para suscribirte." }, 401);
-
   let body: {
     action?: string; plan_id?: string; phone?: string; card_token?: string; source_token?: string; brand?: string; last4?: string;
-    full_name?: string; transaction_id?: string; browser_info?: Record<string, unknown>;
+    full_name?: string; transaction_id?: string; browser_info?: Record<string, unknown>; discount_code?: string; email?: string;
+    customer_email?: string; checkout_token?: string;
   } = {};
   try { body = await req.json(); } catch { /* vacío */ }
 
   try {
     if (body.action === "config") return json({ public_key: publicKey() });
+
+    if (body.action === "validar_codigo") {
+      const r = await checkDiscount(db, String(body.discount_code ?? ""), String(body.plan_id ?? ""));
+      return r.valid ? json(r) : json({ error: r.error }, 400);
+    }
+
+    // ¿Quién paga? 1) sesión iniciada, 2) token del pago en curso, 3) invitado nuevo (solo al iniciar).
+    let user: { id: string; email: string } | null = null;
+    const jwt = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
+    if (jwt.split(".").length === 3) {
+      const { data: auth } = await db.auth.getUser(jwt);
+      if (auth?.user?.email) user = { id: auth.user.id, email: auth.user.email };
+    }
+    const checkoutToken = String(body.checkout_token ?? "");
+    let guestSubId: string | null = null;
+    if (!user && /^[a-f0-9-]{36,80}$/.test(checkoutToken)) {
+      const { data: s } = await db.from("subscriptions").select("id, user_id, customer_email").eq("checkout_token", checkoutToken).maybeSingle();
+      if (s) { user = { id: s.user_id, email: s.customer_email }; guestSubId = s.id; }
+    }
+    let newCheckoutToken: string | null = null;
+    if (!user && (body.action === "iniciar" || body.action === "iniciar_tarjeta")) {
+      const guest = await findOrCreateGuest(db, String(body.customer_email ?? ""), String(body.full_name ?? ""));
+      if ("error" in guest) return json({ error: guest.error }, 400);
+      user = guest;
+      newCheckoutToken = `${crypto.randomUUID()}${crypto.randomUUID().replace(/-/g, "")}`;
+    }
+    if (!user) return json({ error: "Tu sesión de pago expiró. Recarga la página." }, 401);
+
+    if (body.action === "skool_email") {
+      const email = String(body.email ?? "").trim().toLowerCase().slice(0, 200);
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: "Escribe un correo válido." }, 400);
+      let q = db.from("subscriptions").select("id").eq("user_id", user.id).in("status", ["activa", "en_mora", "pendiente"]);
+      if (guestSubId) q = q.eq("id", guestSubId);
+      const { data: sub } = await q.order("created_at", { ascending: false }).limit(1).maybeSingle();
+      if (!sub) return json({ error: "No encontramos tu membresía." }, 404);
+      await db.from("subscriptions").update({ skool_email: email }).eq("id", sub.id);
+      return json({ ok: true });
+    }
+
+    // Código de descuento (opcional) para iniciar / iniciar_tarjeta: se valida aquí y se copia a la suscripción.
+    let discountFields: Record<string, unknown> = {};
+    if ((body.action === "iniciar" || body.action === "iniciar_tarjeta") && String(body.discount_code ?? "").trim()) {
+      const r = await checkDiscount(db, String(body.discount_code), String(body.plan_id ?? ""));
+      if (!r.valid) return json({ error: r.error }, 400);
+      discountFields = { discount_code: r.code, discount_kind: r.kind, discount_value: r.value, discount_remaining: r.remaining };
+    }
 
     if (body.action === "iniciar_tarjeta") {
       // card_token: se usa en el primer pago con 3D Secure. source_token: se guarda para los cobros mensuales.
@@ -67,18 +113,20 @@ Deno.serve(async (req) => {
       const { data: sub, error } = await db.from("subscriptions").insert({
         user_id: user.id, plan_id: plan.id, customer_email: user.email, payment_method: "CARD",
         card_brand: String(body.brand ?? "").slice(0, 30) || null, card_last4: last4, pending_card_token: sourceToken,
+        checkout_token: newCheckoutToken, ...discountFields,
       }).select("id").single();
       if (error) throw error;
 
+      const amountCop = await chargeAmount(db, sub.id);
       const reference = `MEM-${sub.id.slice(0, 8)}-${Date.now()}`;
-      await db.from("subscription_payments").insert({ subscription_id: sub.id, user_id: user.id, reference, amount_cop: plan.price_cop });
+      await db.from("subscription_payments").insert({ subscription_id: sub.id, user_id: user.id, reference, amount_cop: amountCop });
       try {
         const tx = await createCard3dsTransaction({
-          reference, amountCop: plan.price_cop, email: user.email!, cardToken, fullName, phone, browserInfo,
+          reference, amountCop, email: user.email!, cardToken, fullName, phone, browserInfo,
         });
         await db.from("subscription_payments").update({ wompi_transaction_id: tx.id }).eq("reference", reference);
         if (["APPROVED", "DECLINED", "VOIDED", "ERROR"].includes(tx.status)) await applyPayment(db, reference, tx.status, tx.id, tx.message);
-        return json({ ok: true, transaction_id: tx.id, status: tx.status });
+        return json({ ok: true, transaction_id: tx.id, status: tx.status, checkout_token: newCheckoutToken });
       } catch (e) {
         console.error(e);
         await applyPayment(db, reference, "ERROR", null, String((e as Error).message));
@@ -115,14 +163,16 @@ Deno.serve(async (req) => {
       const token = await createNequiToken(phone);
       const { data: sub, error } = await db.from("subscriptions").insert({
         user_id: user.id, plan_id: plan.id, customer_email: user.email, phone_last4: phone.slice(-4), nequi_token: token.id,
+        checkout_token: newCheckoutToken, ...discountFields,
       }).select("id").single();
       if (error) throw error;
-      return json({ ok: true, subscription_id: sub.id, status: "pendiente" });
+      return json({ ok: true, subscription_id: sub.id, status: "pendiente", checkout_token: newCheckoutToken });
     }
 
     if (body.action === "estado") {
-      const { data: sub } = await db.from("subscriptions").select("id, status, nequi_token, payment_source_id, last_error")
-        .eq("user_id", user.id).order("created_at", { ascending: false }).limit(1).maybeSingle();
+      let q = db.from("subscriptions").select("id, status, nequi_token, payment_source_id, last_error").eq("user_id", user.id);
+      if (guestSubId) q = q.eq("id", guestSubId);
+      const { data: sub } = await q.order("created_at", { ascending: false }).limit(1).maybeSingle();
       if (!sub) return json({ status: "ninguna" });
 
       if (sub.status === "pendiente" && !sub.payment_source_id && sub.nequi_token) {
@@ -139,6 +189,7 @@ Deno.serve(async (req) => {
     }
 
     if (body.action === "reactivar") {
+      if (guestSubId) return json({ error: "Inicia sesión para reactivar tu membresía." }, 401);
       const { data: sub } = await db.from("subscriptions").select("id, current_period_end")
         .eq("user_id", user.id).in("status", ["activa", "en_mora"]).eq("cancel_at_period_end", true).maybeSingle();
       if (!sub) return json({ error: "No hay nada que reactivar." }, 400);
@@ -154,3 +205,26 @@ Deno.serve(async (req) => {
     return json({ error: "No pudimos conectar con Nequi. Intenta de nuevo en unos minutos." }, 502);
   }
 });
+
+/**
+ * Pago sin cuenta: busca al usuario por correo o crea una cuenta «Solo Kit» sin acceso
+ * (el acceso al Kit COD se activa cuando se aprueba el pago). Nunca cambia cuentas que ya existían.
+ */
+async function findOrCreateGuest(db: ReturnType<typeof adminClient>, rawEmail: string, rawName: string) {
+  const email = rawEmail.trim().toLowerCase().slice(0, 200);
+  const fullName = rawName.trim().slice(0, 120);
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: "Escribe un correo válido." };
+  if (fullName.length < 3) return { error: "Escribe tu nombre completo." };
+
+  const { data: existing } = await db.from("profiles").select("id").eq("email", email).maybeSingle();
+  if (existing) return { id: existing.id as string, email };
+
+  const password = `${crypto.randomUUID()}${crypto.randomUUID()}`;
+  const { data, error } = await db.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { full_name: fullName } });
+  if (error || !data.user) {
+    console.error("crear invitado", error?.message);
+    return { error: "No pudimos registrar tu correo. Intenta de nuevo." };
+  }
+  await db.from("profiles").update({ full_name: fullName, role: "kit", active: false, pending: false }).eq("id", data.user.id);
+  return { id: data.user.id, email };
+}

@@ -7,11 +7,14 @@ export interface MembershipPlan {
   grants_role: "kit" | "member";
   active: boolean;
   position: number;
+  skool_url: string | null;
+  contact_whatsapp: string | null;
+  compare_price_cop: number | null;
 }
 
 /** Columnas de subscriptions que pueden leer los usuarios (los tokens quedan solo en el servidor). */
 export const SUBSCRIPTION_COLUMNS =
-  "id, user_id, plan_id, status, phone_last4, payment_method, card_brand, card_last4, current_period_end, next_charge_at, failed_attempts, cancel_at_period_end, last_error, created_at";
+  "id, user_id, plan_id, status, customer_email, phone_last4, payment_method, card_brand, card_last4, current_period_end, next_charge_at, failed_attempts, cancel_at_period_end, last_error, created_at, discount_code, discount_remaining, skool_email";
 
 export type SubscriptionStatus = "pendiente" | "activa" | "en_mora" | "cancelada" | "vencida" | "fallida";
 
@@ -30,6 +33,33 @@ export interface Subscription {
   cancel_at_period_end: boolean;
   last_error: string | null;
   created_at: string;
+  customer_email: string;
+  discount_code: string | null;
+  discount_remaining: number;
+  skool_email: string | null;
+}
+
+export interface DiscountCode {
+  code: string;
+  description: string | null;
+  kind: "percent" | "fixed";
+  value: number;
+  duration: "first" | "months" | "forever";
+  duration_months: number | null;
+  plan_id: string | null;
+  max_redemptions: number | null;
+  redemptions: number;
+  expires_at: string | null;
+  active: boolean;
+  created_at: string;
+}
+
+/** «20% de descuento el primer mes», «$10.000 de descuento por 3 meses»… */
+export function discountLabel(d: { kind: string; value: number; duration: string; duration_months?: number | null }) {
+  const amount = d.kind === "percent" ? `${d.value}%` : formatCop(d.value);
+  const when =
+    d.duration === "forever" ? "en todos los cobros" : d.duration === "months" ? `por ${d.duration_months} cobros` : "en el primer cobro";
+  return `${amount} de descuento ${when}`;
 }
 
 export interface SubscriptionPayment {

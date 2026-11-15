@@ -43,7 +43,11 @@ type ThreeDs = { step: string | null; step_status: string | null; html: string |
  * 2. El primer cobro se hace con 3D Secure: si el banco lo pide, se muestra aquí su verificación.
  * 3. Si se aprueba, la tarjeta queda guardada en Wompi para los cobros mensuales.
  */
-export function CardCheckout({ planId }: { planId: string }) {
+export function CardCheckout({ planId, discountCode, getGuest, checkoutToken, onToken, onDone }: {
+  planId: string; discountCode?: string;
+  getGuest?: () => { email: string; name: string } | null | string;
+  checkoutToken?: string | null; onToken?: (t: string) => void; onDone?: () => void;
+}) {
   const router = useRouter();
   const supabase = useRef(createClient()).current;
   const [number, setNumber] = useState("");
@@ -57,6 +61,10 @@ export function CardCheckout({ planId }: { planId: string }) {
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const lastHtml = useRef<string | null>(null);
+  const tokenRef = useRef<string | null | undefined>(checkoutToken);
+  tokenRef.current = checkoutToken ?? tokenRef.current;
+  const onDoneRef = useRef(onDone);
+  onDoneRef.current = onDone;
   const [iframeHtml, setIframeHtml] = useState<string | null>(null);
 
   // Mientras el primer pago está en proceso, consulta su estado cada 2,5 s (máx. 5 minutos).
@@ -71,9 +79,9 @@ export function CardCheckout({ planId }: { planId: string }) {
         setError("Tu banco no confirmó el pago a tiempo. Intenta de nuevo.");
         return;
       }
-      const { data } = await supabase.functions.invoke("nequi-suscripcion", { body: { action: "estado_tarjeta", transaction_id: txId } });
+      const { data } = await supabase.functions.invoke("nequi-suscripcion", { body: { action: "estado_tarjeta", transaction_id: txId, checkout_token: tokenRef.current } });
       if (stopped) return;
-      if (data?.status === "APPROVED") { setTxId(null); setDone(true); router.refresh(); return; }
+      if (data?.status === "APPROVED") { setTxId(null); setDone(true); onDoneRef.current?.(); router.refresh(); return; }
       if (["DECLINED", "VOIDED", "ERROR"].includes(data?.status)) {
         setTxId(null);
         setIframeHtml(null);
@@ -114,6 +122,8 @@ export function CardCheckout({ planId }: { planId: string }) {
     if (cvc.length < 3) return setError("Revisa el código de seguridad (CVC).");
     if (holder.trim().length < 5) return setError("Escribe el nombre como aparece en la tarjeta.");
     if (onlyDigits(phone).length < 7) return setError("Escribe tu número de celular.");
+    const g = getGuest ? getGuest() : null;
+    if (typeof g === "string") return setError(g);
 
     setBusy(true);
     try {
@@ -130,11 +140,13 @@ export function CardCheckout({ planId }: { planId: string }) {
       const { data, error } = await supabase.functions.invoke("nequi-suscripcion", {
         body: {
           action: "iniciar_tarjeta", plan_id: planId, card_token: first.id, source_token: second.id,
-          brand: first.brand, last4: first.last_four, full_name: holder.trim(), phone, browser_info: browserInfo(),
+          brand: first.brand, last4: first.last_four, full_name: g?.name || holder.trim(), phone, browser_info: browserInfo(),
+          discount_code: discountCode, customer_email: g?.email,
         },
       });
       if (error) throw new Error(await errorMessage(error));
-      if (data?.status === "APPROVED") { setDone(true); router.refresh(); }
+      if (data?.checkout_token) { tokenRef.current = String(data.checkout_token); onToken?.(String(data.checkout_token)); }
+      if (data?.status === "APPROVED") { setDone(true); onDone?.(); router.refresh(); }
       else if (["DECLINED", "VOIDED", "ERROR"].includes(data?.status)) setError("Tu banco rechazó el pago. Prueba con otra tarjeta.");
       else { setCvc(""); setNumber(""); setTxId(String(data.transaction_id)); }
     } catch (err) {
@@ -144,7 +156,7 @@ export function CardCheckout({ planId }: { planId: string }) {
     }
   }
 
-  if (done) return <FormMessage success="¡Listo! Tu membresía está activa. Ya puedes entrar a la academia." />;
+  if (done) return <FormMessage success="¡Pago aprobado! Tu membresía de MakeDrop IA está activa." />;
 
   if (txId) {
     const challenge = threeDs?.step === "CHALLENGE";

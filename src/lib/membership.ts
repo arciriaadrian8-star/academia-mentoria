@@ -17,6 +17,9 @@ export interface Subscription {
   plan_id: string;
   status: SubscriptionStatus;
   phone_last4: string | null;
+  payment_method: "NEQUI" | "CARD";
+  card_brand: string | null;
+  card_last4: string | null;
   current_period_end: string | null;
   next_charge_at: string | null;
   failed_attempts: number;
@@ -37,7 +40,7 @@ export interface SubscriptionPayment {
 }
 
 export const SUBSCRIPTION_STATUS: Record<SubscriptionStatus, { label: string; className: string }> = {
-  pendiente: { label: "Esperando aprobación en Nequi", className: "bg-amber-100 text-amber-800" },
+  pendiente: { label: "Pago en proceso", className: "bg-amber-100 text-amber-800" },
   activa: { label: "Activa", className: "bg-emerald-100 text-emerald-800" },
   en_mora: { label: "Pago pendiente", className: "bg-red-100 text-red-700" },
   cancelada: { label: "Cancelada", className: "bg-zinc-100 text-zinc-700" },

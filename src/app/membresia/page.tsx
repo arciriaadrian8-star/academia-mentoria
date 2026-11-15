@@ -6,7 +6,7 @@ import {
   type MembershipPlan, type Subscription, type SubscriptionPayment,
 } from "@/lib/membership";
 import { cn } from "@/lib/utils";
-import { NequiCheckout } from "./NequiCheckout";
+import { PaymentChooser } from "./PaymentChooser";
 import { SubscriptionActions } from "./SubscriptionActions";
 
 export const metadata = { title: "Membresía" };
@@ -47,7 +47,7 @@ export default async function MembershipPage() {
         <p className="text-sm font-semibold text-zinc-500">{settings.academy_name}</p>
         <h1 className="mt-1 text-3xl font-bold tracking-tight">Membresía</h1>
         <p className="mt-2 max-w-md text-sm text-zinc-500">
-          Pagas con tu Nequi y se renueva sola cada periodo. Lo autorizas una vez en tu app y puedes cancelar cuando quieras.
+          Pagas con Nequi o con tarjeta débito/crédito y se renueva sola cada periodo. Puedes cancelar cuando quieras.
         </p>
       </div>
 
@@ -67,10 +67,12 @@ export default async function MembershipPage() {
                 <dd className="font-semibold">{formatCop(livePlan.price_cop)} {intervalLabel(livePlan.interval_days)}</dd>
               </div>
             )}
-            {live.phone_last4 && (
+            {(live.phone_last4 || live.card_last4) && (
               <div>
-                <dt className="text-zinc-500">Nequi</dt>
-                <dd className="font-semibold">•••• {live.phone_last4}</dd>
+                <dt className="text-zinc-500">{live.payment_method === "CARD" ? "Tarjeta" : "Nequi"}</dt>
+                <dd className="font-semibold">
+                  {live.payment_method === "CARD" ? `${live.card_brand ?? ""} •••• ${live.card_last4 ?? ""}` : `•••• ${live.phone_last4}`}
+                </dd>
               </div>
             )}
             {live.current_period_end && (
@@ -82,7 +84,7 @@ export default async function MembershipPage() {
           </dl>
           {live.status === "en_mora" && (
             <p className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
-              No pudimos cobrar tu última cuota{live.last_error ? ` (${live.last_error})` : ""}. Deja saldo en tu Nequi: lo reintentamos
+              No pudimos cobrar tu última cuota{live.last_error ? ` (${live.last_error})` : ""}. Revisa que tengas saldo: lo reintentamos
               automáticamente al día siguiente.
             </p>
           )}
@@ -120,7 +122,7 @@ export default async function MembershipPage() {
                 )}
                 <div className="mt-auto pt-6">
                   {user ? (
-                    <NequiCheckout planId={plan.id} resumePending={sub?.status === "pendiente" && sub.plan_id === plan.id} />
+                    <PaymentChooser planId={plan.id} resumePending={sub?.status === "pendiente" && sub.plan_id === plan.id} />
                   ) : (
                     <div className="space-y-2">
                       <Link href="/registro" className="btn btn-primary w-full">Crear mi cuenta para suscribirme</Link>

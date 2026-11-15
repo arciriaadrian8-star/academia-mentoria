@@ -52,8 +52,8 @@ export default async function MembershipsAdminPage({ searchParams }: { searchPar
         <ArrowLeft className="size-4" /> Miembros
       </Link>
       <PageHeader
-        title="Membresías con Nequi"
-        description="Cobro automático con débito Nequi (Wompi). Al pagar, el alumno recibe su acceso solo y se le renueva cada periodo; si no paga, se reintenta 3 días y luego vence."
+        title="Membresías (Nequi y tarjeta)"
+        description="Cobro automático con Nequi o tarjeta débito/crédito (Wompi). Al pagar, el alumno recibe su acceso solo y se le renueva cada periodo; si no paga, se reintenta 3 días y luego vence."
       >
         <CopyButton text={`${origin}/membresia`} label="Copiar enlace de pago" />
       </PageHeader>
@@ -151,7 +151,7 @@ export default async function MembershipsAdminPage({ searchParams }: { searchPar
                   <Link href={`/miembros/${s.user_id}`} className="font-semibold hover:underline">{nameOf(s.user_id)}</Link>
                   <p className="text-xs text-zinc-500">
                     {planOf(s.plan_id)?.name ?? "Plan"}
-                    {s.phone_last4 && <> · Nequi •••• {s.phone_last4}</>}
+                    {s.payment_method === "CARD" ? <> · Tarjeta {s.card_brand ?? ""} •••• {s.card_last4}</> : s.phone_last4 && <> · Nequi •••• {s.phone_last4}</>}
                     {s.current_period_end && <> · {s.cancel_at_period_end ? "acceso hasta" : "renueva"} {formatDate(s.current_period_end)}</>}
                     {s.last_error && s.status !== "activa" && <> · {s.last_error}</>}
                   </p>

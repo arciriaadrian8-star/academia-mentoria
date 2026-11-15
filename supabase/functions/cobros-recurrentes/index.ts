@@ -19,7 +19,7 @@ Deno.serve(async (req) => {
 
   const { data: due } = await db
     .from("subscriptions")
-    .select("id, user_id, customer_email, payment_source_id, failed_attempts, membership_plans(price_cop, active)")
+    .select("id, user_id, customer_email, payment_source_id, payment_method, failed_attempts, membership_plans(price_cop, active)")
     .in("status", ["activa", "en_mora"])
     .eq("cancel_at_period_end", false)
     .lte("next_charge_at", new Date().toISOString())

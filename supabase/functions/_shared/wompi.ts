@@ -66,12 +66,14 @@ export async function getNequiTokenStatus(token: string) {
   return d?.status as string; // PENDING | APPROVED | DECLINED
 }
 
-async function createPaymentSource(token: string, email: string) {
+export const publicKey = () => env("WOMPI_PUBLIC_KEY");
+
+export async function createPaymentSource(token: string, email: string, type: "NEQUI" | "CARD" = "NEQUI") {
   const acc = await acceptanceTokens();
   const d = await call("/payment_sources", {
     method: "POST",
     key: "private",
-    body: { type: "NEQUI", token, customer_email: email, ...acc },
+    body: { type, token, customer_email: email, ...acc },
   });
   return String(d.id);
 }
@@ -84,7 +86,11 @@ export async function getTransaction(id: string) {
 const FINAL = ["APPROVED", "DECLINED", "VOIDED", "ERROR"];
 
 /** Crea el registro del cobro, lanza la transacción en Wompi y aplica el resultado si ya es final. */
-export async function chargeSubscription(db: SupabaseClient, sub: { id: string; user_id: string; customer_email: string; payment_source_id: string }, priceCop: number) {
+export async function chargeSubscription(
+  db: SupabaseClient,
+  sub: { id: string; user_id: string; customer_email: string; payment_source_id: string; payment_method?: string | null },
+  priceCop: number,
+) {
   const reference = `MEM-${sub.id.slice(0, 8)}-${Date.now()}`;
   const amount = priceCop * 100;
   const { error } = await db.from("subscription_payments").insert({
@@ -104,6 +110,8 @@ export async function chargeSubscription(db: SupabaseClient, sub: { id: string; 
         customer_email: sub.customer_email,
         reference,
         payment_source_id: Number(sub.payment_source_id),
+        // Las tarjetas exigen el número de cuotas; los cobros recurrentes van siempre a 1 cuota.
+        ...(sub.payment_method === "CARD" ? { payment_method: { installments: 1 } } : {}),
       },
     });
     await db.from("subscription_payments").update({ wompi_transaction_id: String(tx.id) }).eq("reference", reference);

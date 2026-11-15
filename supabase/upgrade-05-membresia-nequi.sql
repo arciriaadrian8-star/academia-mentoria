@@ -245,3 +245,8 @@ end;
 $$;
 revoke execute on function public.cancel_subscription(uuid) from public, anon;
 grant execute on function public.cancel_subscription(uuid) to authenticated;
+
+-- ---------------------------------------------------- (upgrade 07) pago con tarjeta
+alter table public.subscriptions add column if not exists payment_method text not null default 'NEQUI' check (payment_method in ('NEQUI', 'CARD'));
+alter table public.subscriptions add column if not exists card_brand text check (char_length(card_brand) <= 30);
+alter table public.subscriptions add column if not exists card_last4 text check (card_last4 ~ '^[0-9]{4}$');

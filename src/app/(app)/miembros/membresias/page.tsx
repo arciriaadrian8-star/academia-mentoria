@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowLeft, CreditCard, Plus } from "lucide-react";
 import { requireAdmin } from "@/lib/auth";
 import {
-  formatCop, formatDate, INTERVALS, intervalLabel, PAYMENT_STATUS, PLAN_ROLE_LABELS, SUBSCRIPTION_STATUS,
+  SUBSCRIPTION_COLUMNS, formatCop, formatDate, INTERVALS, intervalLabel, PAYMENT_STATUS, PLAN_ROLE_LABELS, SUBSCRIPTION_STATUS,
   type MembershipPlan, type Subscription, type SubscriptionPayment,
 } from "@/lib/membership";
 import { getOrigin } from "@/lib/site";
@@ -19,7 +19,7 @@ export default async function MembershipsAdminPage({ searchParams }: { searchPar
   const { supabase } = await requireAdmin();
   const [{ data: planRows, error: tableError }, { data: subRows }, { data: payRows }, origin] = await Promise.all([
     supabase.from("membership_plans").select("*").order("position").order("price_cop"),
-    supabase.from("subscriptions").select("*").order("created_at", { ascending: false }).limit(300),
+    supabase.from("subscriptions").select(SUBSCRIPTION_COLUMNS).order("created_at", { ascending: false }).limit(300),
     supabase.from("subscription_payments").select("*").order("created_at", { ascending: false }).limit(50),
     getOrigin(),
   ]);

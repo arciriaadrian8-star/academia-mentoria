@@ -2,7 +2,7 @@ import Link from "next/link";
 import { CheckCircle2 } from "lucide-react";
 import { getSession, getSettings } from "@/lib/auth";
 import {
-  formatCop, formatDate, intervalLabel, PAYMENT_STATUS, PLAN_ROLE_LABELS, SUBSCRIPTION_STATUS,
+  SUBSCRIPTION_COLUMNS, formatCop, formatDate, intervalLabel, PAYMENT_STATUS, PLAN_ROLE_LABELS, SUBSCRIPTION_STATUS,
   type MembershipPlan, type Subscription, type SubscriptionPayment,
 } from "@/lib/membership";
 import { cn } from "@/lib/utils";
@@ -20,7 +20,7 @@ export default async function MembershipPage() {
   let sub: Subscription | null = null;
   let payments: SubscriptionPayment[] = [];
   if (user) {
-    const { data } = await supabase.from("subscriptions").select("*").eq("user_id", user.id)
+    const { data } = await supabase.from("subscriptions").select(SUBSCRIPTION_COLUMNS).eq("user_id", user.id)
       .order("created_at", { ascending: false }).limit(1).maybeSingle();
     sub = (data as Subscription) ?? null;
     if (sub) {

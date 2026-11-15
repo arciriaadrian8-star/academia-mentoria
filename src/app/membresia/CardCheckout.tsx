@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CreditCard, Loader2, Lock } from "lucide-react";
+import { CreditCard, Loader2, Lock, ShieldCheck } from "lucide-react";
 import { FormMessage } from "@/components/FormMessage";
 import { createClient } from "@/lib/supabase/client";
 
@@ -17,9 +17,31 @@ async function errorMessage(error: unknown) {
 
 const onlyDigits = (v: string) => v.replace(/\D/g, "");
 
+/** El HTML del reto 3D Secure llega con entidades (&lt; &gt;…): se decodifica antes de pintarlo. */
+function decodeEntities(html: string) {
+  if (!html.includes("&lt;")) return html; // ya viene como HTML normal
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  return doc.documentElement.textContent ?? html;
+}
+
+function browserInfo() {
+  return {
+    browser_color_depth: String(window.screen.colorDepth ?? 24),
+    browser_screen_height: String(window.screen.height ?? 800),
+    browser_screen_width: String(window.screen.width ?? 1280),
+    browser_language: navigator.language || "es-CO",
+    browser_user_agent: navigator.userAgent,
+    browser_tz: String(new Date().getTimezoneOffset()),
+  };
+}
+
+type ThreeDs = { step: string | null; step_status: string | null; html: string | null } | null;
+
 /**
- * Pago con tarjeta débito/crédito. Los datos de la tarjeta van directo del navegador a Wompi
- * (nunca pasan por nuestro servidor): Wompi devuelve un token y con ese token se crea la suscripción.
+ * Pago con tarjeta débito/crédito (nacional o internacional).
+ * 1. Los datos de la tarjeta van directo del navegador a Wompi (nunca a nuestro servidor) y se crean 2 tokens.
+ * 2. El primer cobro se hace con 3D Secure: si el banco lo pide, se muestra aquí su verificación.
+ * 3. Si se aprueba, la tarjeta queda guardada en Wompi para los cobros mensuales.
  */
 export function CardCheckout({ planId }: { planId: string }) {
   const router = useRouter();
@@ -28,32 +50,59 @@ export function CardCheckout({ planId }: { planId: string }) {
   const [exp, setExp] = useState("");
   const [cvc, setCvc] = useState("");
   const [holder, setHolder] = useState("");
+  const [phone, setPhone] = useState("");
   const [busy, setBusy] = useState(false);
-  const [waiting, setWaiting] = useState(false);
+  const [txId, setTxId] = useState<string | null>(null);
+  const [threeDs, setThreeDs] = useState<ThreeDs>(null);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const lastHtml = useRef<string | null>(null);
+  const [iframeHtml, setIframeHtml] = useState<string | null>(null);
 
-  // Si el cobro quedó «en proceso», revisa cada 4 s (máx. 3 minutos).
+  // Mientras el primer pago está en proceso, consulta su estado cada 2,5 s (máx. 5 minutos).
   useEffect(() => {
-    if (!waiting) return;
+    if (!txId) return;
     const started = Date.now();
-    const id = setInterval(async () => {
-      if (Date.now() - started > 3 * 60_000) {
-        clearInterval(id);
-        setWaiting(false);
-        setError("Tu banco aún no confirma el pago. Revisa en unos minutos esta página.");
+    let stopped = false;
+    const tick = async () => {
+      if (stopped) return;
+      if (Date.now() - started > 5 * 60_000) {
+        setTxId(null);
+        setError("Tu banco no confirmó el pago a tiempo. Intenta de nuevo.");
         return;
       }
-      const { data } = await supabase.functions.invoke("nequi-suscripcion", { body: { action: "estado" } });
-      if (data?.status === "activa") { clearInterval(id); setWaiting(false); setDone(true); router.refresh(); }
-      else if (data?.status === "fallida") {
-        clearInterval(id); setWaiting(false);
-        setError(data.last_error ? `Pago rechazado: ${data.last_error}` : "Tu banco rechazó el pago. Prueba con otra tarjeta.");
+      const { data } = await supabase.functions.invoke("nequi-suscripcion", { body: { action: "estado_tarjeta", transaction_id: txId } });
+      if (stopped) return;
+      if (data?.status === "APPROVED") { setTxId(null); setDone(true); router.refresh(); return; }
+      if (["DECLINED", "VOIDED", "ERROR"].includes(data?.status)) {
+        setTxId(null);
+        setIframeHtml(null);
+        setError(data.message ? `Pago rechazado: ${data.message}` : "Tu banco rechazó el pago. Prueba con otra tarjeta.");
         router.refresh();
+        return;
       }
-    }, 4000);
-    return () => clearInterval(id);
-  }, [waiting, supabase, router]);
+      const t = (data?.three_ds ?? null) as ThreeDs;
+      setThreeDs(t);
+      if (t?.html && t.step_status === "PENDING" && t.html !== lastHtml.current) {
+        lastHtml.current = t.html;
+        setIframeHtml(decodeEntities(t.html));
+      }
+      setTimeout(tick, 2500);
+    };
+    const first = setTimeout(tick, 1500);
+    return () => { stopped = true; clearTimeout(first); };
+  }, [txId, supabase, router]);
+
+  async function tokenize(base: string, key: string, card: Record<string, string>) {
+    const res = await fetch(`${base}/tokens/cards`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify(card),
+    });
+    const tok = await res.json().catch(() => null);
+    if (!res.ok || !tok?.data?.id) throw new Error("Los datos de la tarjeta no son válidos. Revísalos e intenta de nuevo.");
+    return tok.data as { id: string; brand?: string; last_four?: string };
+  }
 
   async function pay(e: React.FormEvent) {
     e.preventDefault();
@@ -64,28 +113,30 @@ export function CardCheckout({ planId }: { planId: string }) {
     if (!mm || !yy || Number(mm) < 1 || Number(mm) > 12) return setError("Escribe la fecha de vencimiento como MM/AA.");
     if (cvc.length < 3) return setError("Revisa el código de seguridad (CVC).");
     if (holder.trim().length < 5) return setError("Escribe el nombre como aparece en la tarjeta.");
+    if (onlyDigits(phone).length < 7) return setError("Escribe tu número de celular.");
 
     setBusy(true);
     try {
       const { data: cfg, error: cfgError } = await supabase.functions.invoke("nequi-suscripcion", { body: { action: "config" } });
       if (cfgError || !cfg?.public_key) throw new Error(cfgError ? await errorMessage(cfgError) : "Pagos con tarjeta no disponibles.");
-      const base = String(cfg.public_key).startsWith("pub_prod_") ? "https://production.wompi.co/v1" : "https://sandbox.wompi.co/v1";
+      const key = String(cfg.public_key);
+      const base = key.startsWith("pub_prod_") ? "https://production.wompi.co/v1" : "https://sandbox.wompi.co/v1";
+      const card = { number: num, cvc, exp_month: mm.padStart(2, "0"), exp_year: yy.slice(-2), card_holder: holder.trim() };
 
-      const res = await fetch(`${base}/tokens/cards`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${cfg.public_key}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ number: num, cvc, exp_month: mm.padStart(2, "0"), exp_year: yy.slice(-2), card_holder: holder.trim() }),
-      });
-      const tok = await res.json().catch(() => null);
-      if (!res.ok || !tok?.data?.id) throw new Error("Los datos de la tarjeta no son válidos. Revísalos e intenta de nuevo.");
+      // Un token para el primer pago (3D Secure) y otro para guardar la tarjeta para los cobros mensuales.
+      const first = await tokenize(base, key, card);
+      const second = await tokenize(base, key, card);
 
       const { data, error } = await supabase.functions.invoke("nequi-suscripcion", {
-        body: { action: "iniciar_tarjeta", plan_id: planId, card_token: tok.data.id, brand: tok.data.brand, last4: tok.data.last_four },
+        body: {
+          action: "iniciar_tarjeta", plan_id: planId, card_token: first.id, source_token: second.id,
+          brand: first.brand, last4: first.last_four, full_name: holder.trim(), phone, browser_info: browserInfo(),
+        },
       });
       if (error) throw new Error(await errorMessage(error));
-      if (data?.status === "activa") { setDone(true); router.refresh(); }
-      else if (data?.status === "fallida") setError(data.last_error ? `Pago rechazado: ${data.last_error}` : "Tu banco rechazó el pago. Prueba con otra tarjeta.");
-      else setWaiting(true);
+      if (data?.status === "APPROVED") { setDone(true); router.refresh(); }
+      else if (["DECLINED", "VOIDED", "ERROR"].includes(data?.status)) setError("Tu banco rechazó el pago. Prueba con otra tarjeta.");
+      else { setCvc(""); setNumber(""); setTxId(String(data.transaction_id)); }
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -94,11 +145,31 @@ export function CardCheckout({ planId }: { planId: string }) {
   }
 
   if (done) return <FormMessage success="¡Listo! Tu membresía está activa. Ya puedes entrar a la academia." />;
-  if (waiting) {
+
+  if (txId) {
+    const challenge = threeDs?.step === "CHALLENGE";
     return (
-      <p className="flex items-center gap-2 rounded-xl bg-zinc-50 p-4 text-sm font-semibold">
-        <Loader2 className="size-4 animate-spin" /> Confirmando el pago con tu banco...
-      </p>
+      <div className="space-y-3">
+        <p className="flex items-center gap-2 rounded-xl bg-zinc-50 p-3 text-sm font-semibold">
+          <Loader2 className="size-4 animate-spin" />
+          {challenge ? "Tu banco te pide confirmar el pago:" : "Verificando el pago con tu banco (3D Secure)..."}
+        </p>
+        {threeDs && (
+          <p className="flex items-center gap-1.5 text-xs text-zinc-500">
+            <ShieldCheck className="size-4 text-emerald-600" /> Verificación segura 3D Secure (Visa Secure / Mastercard Identity Check)
+          </p>
+        )}
+        {iframeHtml && (
+          <iframe
+            title="Verificación de tu banco"
+            srcDoc={iframeHtml}
+            className="w-full rounded-xl border border-zinc-200 bg-white"
+            style={{ height: challenge ? 520 : 120 }}
+            sandbox="allow-forms allow-scripts allow-same-origin allow-top-navigation-by-user-activation allow-popups"
+          />
+        )}
+        <p className="text-xs text-zinc-500">No cierres esta página hasta que termine.</p>
+      </div>
     );
   }
 
@@ -129,12 +200,17 @@ export function CardCheckout({ planId }: { planId: string }) {
         <input id={`ch-${planId}`} autoComplete="cc-name" required maxLength={60} className="input uppercase"
           value={holder} onChange={(e) => setHolder(e.target.value)} />
       </div>
+      <div>
+        <label className="label" htmlFor={`cp-${planId}`}>Celular</label>
+        <input id={`cp-${planId}`} type="tel" inputMode="tel" autoComplete="tel" required maxLength={16} className="input"
+          placeholder="3001234567" value={phone} onChange={(e) => setPhone(e.target.value)} />
+      </div>
       <button type="submit" disabled={busy} className="btn btn-primary w-full">
         {busy ? <Loader2 className="size-4 animate-spin" /> : <CreditCard className="size-4" />}
         Suscribirme con tarjeta
       </button>
       <p className="flex items-center justify-center gap-1 text-center text-xs text-zinc-500">
-        <Lock className="size-3" /> Débito o crédito, nacional o internacional. Procesado por Wompi; tu tarjeta no se guarda en nuestra web.
+        <Lock className="size-3" /> Débito o crédito, nacional o internacional. Verificado con 3D Secure y procesado por Wompi; tu tarjeta no se guarda en nuestra web.
       </p>
     </form>
   );

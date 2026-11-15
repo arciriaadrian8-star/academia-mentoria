@@ -1,4 +1,4 @@
-// Cliente mínimo de Wompi (Colombia) para suscripciones con Nequi.
+// Cliente mínimo de Wompi (Colombia) para suscripciones con Nequi y tarjeta.
 // Flujo: token Nequi (el alumno aprueba en su app) → fuente de pago → transacciones recurrentes.
 // Secretos (Supabase > Edge Functions > Secrets):
 //   WOMPI_PUBLIC_KEY (pub_prod_… o pub_test_…), WOMPI_PRIVATE_KEY, WOMPI_INTEGRITY_SECRET, WOMPI_EVENTS_SECRET
@@ -78,6 +78,55 @@ export async function createPaymentSource(token: string, email: string, type: "N
   return String(d.id);
 }
 
+export type BrowserInfo = {
+  browser_color_depth: string; browser_screen_height: string; browser_screen_width: string;
+  browser_language: string; browser_user_agent: string; browser_tz: string;
+};
+
+/** Primer pago con tarjeta usando 3D Secure (el banco puede pedirle al alumno que confirme). */
+export async function createCard3dsTransaction(args: {
+  reference: string; amountCop: number; email: string; cardToken: string;
+  fullName: string; phone: string; browserInfo: BrowserInfo;
+}) {
+  const amount = args.amountCop * 100;
+  const acc = await acceptanceTokens();
+  const signature = await sha256Hex(`${args.reference}${amount}COP${env("WOMPI_INTEGRITY_SECRET")}`);
+  const sandbox = !env("WOMPI_PUBLIC_KEY").startsWith("pub_prod_");
+  const d = await call("/transactions", {
+    method: "POST",
+    key: "private",
+    body: {
+      acceptance_token: acc.acceptance_token,
+      accept_personal_auth: acc.accept_personal_auth,
+      amount_in_cents: amount,
+      currency: "COP",
+      signature,
+      customer_email: args.email,
+      reference: args.reference,
+      payment_method: { type: "CARD", token: args.cardToken, installments: 1 },
+      is_three_ds: true,
+      ...(sandbox ? { three_ds_auth_type: "challenge_v2" } : {}),
+      customer_data: { full_name: args.fullName, phone_number: args.phone, browser_info: args.browserInfo },
+    },
+  });
+  return { id: String(d.id), status: d.status as string, message: (d.status_message ?? null) as string | null };
+}
+
+/** Estado de una transacción incluyendo el paso de 3D Secure (para mostrar el reto del banco). */
+export async function getTransactionDetail(id: string) {
+  const d = await call(`/transactions/${id}`);
+  const auth = d?.payment_method?.extra?.three_ds_auth ?? null;
+  return {
+    id: String(d.id),
+    status: d.status as string,
+    message: (d.status_message ?? null) as string | null,
+    reference: d.reference as string,
+    three_ds: auth
+      ? { step: auth.current_step ?? null, step_status: auth.current_step_status ?? null, html: auth.three_ds_method_data ?? null }
+      : null,
+  };
+}
+
 export async function getTransaction(id: string) {
   const d = await call(`/transactions/${id}`);
   return { id: String(d.id), status: d.status as string, message: (d.status_message ?? null) as string | null, reference: d.reference as string };
@@ -123,7 +172,38 @@ export async function chargeSubscription(
   }
 }
 
+/**
+ * Tarjetas: el primer pago se hace con 3D Secure usando un token de un solo uso. Cuando ese pago queda
+ * APPROVED se crea la fuente de pago (con el segundo token) para los cobros mensuales. Usa el mismo
+ * «candado» que Nequi para que la página, el webhook y el cron no la creen dos veces.
+ */
+async function ensureCardSource(db: SupabaseClient, reference: string) {
+  const { data: pay } = await db.from("subscription_payments").select("subscription_id").eq("reference", reference).maybeSingle();
+  if (!pay) return;
+  const { data: claimed } = await db
+    .from("subscriptions")
+    .update({ payment_source_id: "creando", updated_at: new Date().toISOString() })
+    .eq("id", pay.subscription_id)
+    .eq("payment_method", "CARD")
+    .is("payment_source_id", null)
+    .not("pending_card_token", "is", null)
+    .select("id, customer_email, pending_card_token")
+    .maybeSingle();
+  if (!claimed) return;
+  try {
+    const sourceId = await createPaymentSource(claimed.pending_card_token!, claimed.customer_email, "CARD");
+    await db.from("subscriptions").update({ payment_source_id: sourceId, pending_card_token: null }).eq("id", claimed.id);
+  } catch (e) {
+    console.error("fuente tarjeta", (e as Error).message);
+    await db.from("subscriptions").update({
+      payment_source_id: null, pending_card_token: null,
+      last_error: "Pago recibido, pero el banco no permitió guardar la tarjeta para cobros automáticos",
+    }).eq("id", claimed.id);
+  }
+}
+
 export async function applyPayment(db: SupabaseClient, reference: string, status: string, txId: string | null, message: string | null) {
+  if (status === "APPROVED") await ensureCardSource(db, reference);
   const { data, error } = await db.rpc("apply_subscription_payment", {
     p_reference: reference, p_status: status, p_transaction_id: txId, p_message: message,
   });

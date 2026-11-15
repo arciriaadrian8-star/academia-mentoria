@@ -250,3 +250,12 @@ grant execute on function public.cancel_subscription(uuid) to authenticated;
 alter table public.subscriptions add column if not exists payment_method text not null default 'NEQUI' check (payment_method in ('NEQUI', 'CARD'));
 alter table public.subscriptions add column if not exists card_brand text check (char_length(card_brand) <= 30);
 alter table public.subscriptions add column if not exists card_last4 text check (card_last4 ~ '^[0-9]{4}$');
+
+-- ------------------------------------------- (upgrade 08) primer cobro con 3D Secure
+-- Token de la tarjeta guardado solo mientras se completa la verificación 3DS del primer pago.
+alter table public.subscriptions add column if not exists pending_card_token text;
+-- Los alumnos no ven tokens ni la fuente de pago: solo las columnas de abajo.
+revoke select on public.subscriptions from authenticated;
+grant select (id, user_id, plan_id, status, customer_email, phone_last4, payment_method, card_brand, card_last4,
+  current_period_end, next_charge_at, failed_attempts, cancel_at_period_end, canceled_at, last_error, created_at, updated_at)
+  on public.subscriptions to authenticated;

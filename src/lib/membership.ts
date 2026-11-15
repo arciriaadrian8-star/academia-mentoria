@@ -9,6 +9,10 @@ export interface MembershipPlan {
   position: number;
 }
 
+/** Columnas de subscriptions que pueden leer los usuarios (los tokens quedan solo en el servidor). */
+export const SUBSCRIPTION_COLUMNS =
+  "id, user_id, plan_id, status, phone_last4, payment_method, card_brand, card_last4, current_period_end, next_charge_at, failed_attempts, cancel_at_period_end, last_error, created_at";
+
 export type SubscriptionStatus = "pendiente" | "activa" | "en_mora" | "cancelada" | "vencida" | "fallida";
 
 export interface Subscription {

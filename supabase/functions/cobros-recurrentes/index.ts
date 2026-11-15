@@ -1,16 +1,20 @@
 // Cobro automático de las membresías. Lo llama pg_cron (ver upgrade-06-cron-cobros.sql) con
-// el header x-cron-secret = CRON_SECRET.
+// el header x-cron-secret (guardado en Vault como «cron_secret_cobros», o en el secreto CRON_SECRET).
 //  1. Revisa en Wompi los cobros que quedaron PENDING.
 //  2. Cobra las suscripciones cuya fecha de cobro ya llegó (y reintenta las que están en mora).
 //  3. Vence las que pasaron el periodo + 3 días de gracia sin pagar.
 import { adminClient, chargeSubscription, json, syncPendingPayments, wompiConfigured } from "../_shared/wompi.ts";
 
 Deno.serve(async (req) => {
-  const secret = (Deno.env.get("CRON_SECRET") ?? "").trim();
+  const db = adminClient();
+  let secret = (Deno.env.get("CRON_SECRET") ?? "").trim();
+  if (!secret) {
+    const { data } = await db.rpc("cron_secret_cobros");
+    secret = String(data ?? "");
+  }
   if (!secret || req.headers.get("x-cron-secret") !== secret) return json({ error: "No autorizado" }, 401);
   if (!wompiConfigured()) return json({ error: "Wompi no configurado" }, 503);
 
-  const db = adminClient();
   await syncPendingPayments(db, { olderThanMinutes: 5 });
 
   const { data: due } = await db

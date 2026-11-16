@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { CheckCircle2, Wrench } from "lucide-react";
 import { getSession } from "@/lib/auth";
+import { formatUsdApprox, getCopPerUsd } from "@/lib/fx";
 import { MAKEDROP } from "@/lib/makedrop";
 import {
   SUBSCRIPTION_COLUMNS, formatCop, formatDate, intervalLabel, PAYMENT_STATUS, SUBSCRIPTION_STATUS,
@@ -15,7 +16,7 @@ export const metadata = { title: "MakeDrop IA | Membresía" };
 
 /* eslint-disable @next/next/no-img-element */
 export default async function MembershipPage() {
-  const { supabase, user, profile } = await getSession();
+  const [{ supabase, user, profile }, copPerUsd] = await Promise.all([getSession(), getCopPerUsd()]);
   const { data: planRows } = await supabase
     .from("membership_plans").select("*").eq("active", true).order("position").order("price_cop");
   const plans = (planRows ?? []) as MembershipPlan[];
@@ -75,7 +76,10 @@ export default async function MembershipPage() {
                 {livePlan && (
                   <div>
                     <dt className="text-zinc-500">Precio</dt>
-                    <dd className="font-semibold">{formatCop(livePlan.price_cop)} {intervalLabel(livePlan.interval_days)}</dd>
+                    <dd className="font-semibold">
+                      {formatCop(livePlan.price_cop)} {intervalLabel(livePlan.interval_days)}
+                      {copPerUsd && <span className="block text-xs font-normal text-zinc-500">{formatUsdApprox(livePlan.price_cop, copPerUsd)}</span>}
+                    </dd>
                   </div>
                 )}
                 {(live.phone_last4 || live.card_last4) && (
@@ -144,6 +148,12 @@ export default async function MembershipPage() {
                     {formatCop(plan.price_cop)}
                     <span className="ml-1 text-sm font-medium text-zinc-500">{intervalLabel(plan.interval_days)}</span>
                   </p>
+                  {copPerUsd && (
+                    <p className="mt-0.5 text-sm font-semibold text-zinc-500">
+                      {formatUsdApprox(plan.price_cop, copPerUsd)} {intervalLabel(plan.interval_days)}
+                      <span className="ml-1 text-xs font-normal">(aprox., se cobra en pesos colombianos)</span>
+                    </p>
+                  )}
                   <p className="mt-1 text-xs text-zinc-500">Cobro automático cada mes.</p>
                   {plan.description && (
                     <ul className="mt-4 space-y-2 text-sm text-zinc-600">
@@ -156,6 +166,7 @@ export default async function MembershipPage() {
                   )}
                   <div className="mt-auto pt-6">
                     <PaymentChooser
+                      copPerUsd={copPerUsd}
                       planId={plan.id}
                       resumePending={Boolean(user) && sub?.status === "pendiente" && sub?.plan_id === plan.id}
                       guest={!user}

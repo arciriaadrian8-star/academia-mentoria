@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState } from "react";
 import { CheckCircle2, CreditCard, Loader2, Smartphone, Tag, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { formatUsdApprox } from "@/lib/fx";
 import { discountLabel, formatCop } from "@/lib/membership";
 import { cn } from "@/lib/utils";
 import { CardCheckout } from "./CardCheckout";
@@ -15,8 +16,8 @@ type Applied = { code: string; label: string; first_price: number; regular_price
  * Checkout de un plan. Sin sesión, el alumno solo escribe su nombre y correo (el mismo de Skool):
  * la cuenta se crea sola al pagar. Al aprobarse el pago se muestran los pasos para entrar a Skool.
  */
-export function PaymentChooser({ planId, resumePending, guest, skoolUrl, whatsapp }: {
-  planId: string; resumePending: boolean; guest: boolean; skoolUrl: string; whatsapp: string;
+export function PaymentChooser({ planId, resumePending, guest, skoolUrl, whatsapp, copPerUsd = null }: {
+  planId: string; resumePending: boolean; guest: boolean; skoolUrl: string; whatsapp: string; copPerUsd?: number | null;
 }) {
   const supabase = useRef(createClient()).current;
   const [method, setMethod] = useState<"nequi" | "card">("nequi");
@@ -85,6 +86,7 @@ export function PaymentChooser({ planId, resumePending, guest, skoolUrl, whatsap
             <p className="font-semibold text-emerald-800"><Tag className="mr-1 inline size-4" />Cupón aplicado: {applied.code}</p>
             <p className="mt-0.5 text-emerald-700">
               {applied.label}. Hoy pagas <b>{formatCop(applied.first_price)}</b>
+              {copPerUsd && <> ({formatUsdApprox(applied.first_price, copPerUsd)})</>}
               {applied.first_price !== applied.regular_price && <> <s className="text-emerald-600/70">{formatCop(applied.regular_price)}</s></>}
             </p>
           </div>

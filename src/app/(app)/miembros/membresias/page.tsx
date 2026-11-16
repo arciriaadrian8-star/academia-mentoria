@@ -7,6 +7,7 @@ import {
   type DiscountCode, type MembershipPlan, type Subscription, type SubscriptionPayment,
 } from "@/lib/membership";
 import { getOrigin } from "@/lib/site";
+import { formatUsdApprox, getCopPerUsd } from "@/lib/fx";
 import { cn } from "@/lib/utils";
 import { ConfirmButton } from "@/components/ConfirmButton";
 import { CopyButton } from "@/components/CopyButton";
@@ -65,6 +66,8 @@ export default async function MembershipsAdminPage({ searchParams }: { searchPar
     supabase.rpc("admin_upcoming_charges"),
     supabase.rpc("admin_billing_health"),
   ]);
+  const copPerUsd = await getCopPerUsd();
+  const usd = (cop: number) => { const t = formatUsdApprox(cop, copPerUsd); return t ? <span className="ml-1 text-xs font-normal text-zinc-500">({t})</span> : null; };
   type Upcoming = { subscription_id: string; next_charge_at: string | null; amount_cop: number; has_source: boolean; payment_method: string; cancel_at_period_end: boolean; status: string };
   const upcoming = (upcomingRows ?? []) as Upcoming[];
   const upcomingOf = (id: string) => upcoming.find((u) => u.subscription_id === id);
@@ -115,8 +118,8 @@ export default async function MembershipsAdminPage({ searchParams }: { searchPar
 
       <div className="mb-8 grid gap-3 sm:grid-cols-3">
         <div className="card p-4"><p className="text-xs text-zinc-500">Suscripciones activas</p><p className="text-2xl font-bold">{live.length}</p></div>
-        <div className="card p-4"><p className="text-xs text-zinc-500">Ingreso recurrente mensual</p><p className="text-2xl font-bold">{formatCop(mrr)}</p></div>
-        <div className="card p-4"><p className="text-xs text-zinc-500">Cobrado este mes</p><p className="text-2xl font-bold">{formatCop(approvedThisMonth)}</p></div>
+        <div className="card p-4"><p className="text-xs text-zinc-500">Ingreso recurrente mensual</p><p className="text-2xl font-bold">{formatCop(mrr)}{usd(mrr)}</p></div>
+        <div className="card p-4"><p className="text-xs text-zinc-500">Cobrado este mes</p><p className="text-2xl font-bold">{formatCop(approvedThisMonth)}{usd(approvedThisMonth)}</p></div>
       </div>
 
       {/* ------------------------------------------------- Cobro automático */}
@@ -133,6 +136,11 @@ export default async function MembershipsAdminPage({ searchParams }: { searchPar
         ) : (
           <p className="font-semibold text-red-700">⚠️ El cobro automático aún no ha corrido.</p>
         )}
+        {copPerUsd && (
+          <p className="mt-1 text-xs text-zinc-500">
+            Los dólares son aproximados (1 US$ ≈ {formatCop(Math.round(copPerUsd))} hoy). Wompi siempre cobra en pesos colombianos.
+          </p>
+        )}
       </div>
       {upcoming.length === 0 ? (
         <p className="mb-10 text-sm text-zinc-500">No hay cobros programados.</p>
@@ -147,7 +155,7 @@ export default async function MembershipsAdminPage({ searchParams }: { searchPar
                 {ok ? (
                   <>
                     <span className="text-zinc-600">{fmtDateTime(u.next_charge_at!)}</span>
-                    <span className="font-semibold">{formatCop(u.amount_cop)}</span>
+                    <span className="font-semibold">{formatCop(u.amount_cop)}{usd(u.amount_cop)}</span>
                     <span className="chip bg-emerald-100 text-emerald-800">✅ Se cobra solo · {u.payment_method === "CARD" ? "Tarjeta" : "Nequi"}</span>
                   </>
                 ) : u.cancel_at_period_end ? (
@@ -174,7 +182,7 @@ export default async function MembershipsAdminPage({ searchParams }: { searchPar
                   <p className="font-semibold">{p.name}</p>
                   <p className="text-xs text-zinc-500">
                     {p.compare_price_cop && p.compare_price_cop > p.price_cop && <><s>{formatCop(p.compare_price_cop)}</s> → </>}
-                    {formatCop(p.price_cop)} {intervalLabel(p.interval_days)} · acceso solo al Kit COD
+                    {formatCop(p.price_cop)}{usd(p.price_cop)} {intervalLabel(p.interval_days)} · acceso solo al Kit COD
                   </p>
                 </div>
                 <span className={cn("chip", p.active ? "bg-emerald-100 text-emerald-800" : "bg-zinc-100 text-zinc-600")}>{p.active ? "Visible" : "Oculto"}</span>
@@ -348,7 +356,7 @@ export default async function MembershipsAdminPage({ searchParams }: { searchPar
             <li key={p.id} className="flex flex-wrap items-center gap-3 px-4 py-3 text-sm">
               <span className="w-36 text-zinc-500">{formatDate(p.created_at)}</span>
               <span className="min-w-0 flex-1 font-medium">{nameOf(p.user_id)}</span>
-              <span className="font-semibold">{formatCop(p.amount_cop)}</span>
+              <span className="font-semibold">{formatCop(p.amount_cop)}{usd(p.amount_cop)}</span>
               <span className={cn("chip", PAYMENT_STATUS[p.status].className)} title={p.status_message ?? undefined}>{PAYMENT_STATUS[p.status].label}</span>
             </li>
           ))}

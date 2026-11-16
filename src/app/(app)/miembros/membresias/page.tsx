@@ -56,13 +56,21 @@ function PlanFields({ plan }: { plan?: MembershipPlan }) {
 export default async function MembershipsAdminPage({ searchParams }: { searchParams: Promise<{ ok?: string; error?: string }> }) {
   const { ok, error } = await searchParams;
   const { supabase } = await requireAdmin();
-  const [{ data: planRows, error: tableError }, { data: subRows }, { data: payRows }, { data: codeRows }, origin] = await Promise.all([
+  const [{ data: planRows, error: tableError }, { data: subRows }, { data: payRows }, { data: codeRows }, origin, { data: upcomingRows }, { data: healthRows }] = await Promise.all([
     supabase.from("membership_plans").select("*").order("position").order("price_cop"),
     supabase.from("subscriptions").select(SUBSCRIPTION_COLUMNS).order("created_at", { ascending: false }).limit(300),
     supabase.from("subscription_payments").select("*").order("created_at", { ascending: false }).limit(50),
     supabase.from("discount_codes").select("*").order("created_at", { ascending: false }),
     getOrigin(),
+    supabase.rpc("admin_upcoming_charges"),
+    supabase.rpc("admin_billing_health"),
   ]);
+  type Upcoming = { subscription_id: string; next_charge_at: string | null; amount_cop: number; has_source: boolean; payment_method: string; cancel_at_period_end: boolean; status: string };
+  const upcoming = (upcomingRows ?? []) as Upcoming[];
+  const upcomingOf = (id: string) => upcoming.find((u) => u.subscription_id === id);
+  const health = ((healthRows ?? []) as { last_run: string | null; last_status: string | null; runs_24h: number; failed_24h: number }[])[0];
+  const fmtDateTime = (iso: string) =>
+    new Date(iso).toLocaleString("es-CO", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", timeZone: "America/Bogota" });
   const plans = (planRows ?? []) as MembershipPlan[];
   const subs = (subRows ?? []) as unknown as Subscription[];
   const payments = (payRows ?? []) as SubscriptionPayment[];
@@ -110,6 +118,50 @@ export default async function MembershipsAdminPage({ searchParams }: { searchPar
         <div className="card p-4"><p className="text-xs text-zinc-500">Ingreso recurrente mensual</p><p className="text-2xl font-bold">{formatCop(mrr)}</p></div>
         <div className="card p-4"><p className="text-xs text-zinc-500">Cobrado este mes</p><p className="text-2xl font-bold">{formatCop(approvedThisMonth)}</p></div>
       </div>
+
+      {/* ------------------------------------------------- Cobro automático */}
+      <h2 className="mb-3 text-lg font-bold">Cobro automático</h2>
+      <div className="card mb-3 p-4 text-sm">
+        {health?.last_run ? (
+          <p className={cn("font-semibold", health.last_status === "succeeded" && health.failed_24h === 0 ? "text-emerald-700" : "text-red-700")}>
+            {health.last_status === "succeeded" && health.failed_24h === 0 ? "✅ Funcionando" : "⚠️ Revisar"}
+            <span className="ml-2 font-normal text-zinc-600">
+              Última revisión: {fmtDateTime(health.last_run)} · revisa 3 veces al día (8 a.m., 2 p.m. y 8 p.m.)
+              {health.failed_24h > 0 && ` · ${health.failed_24h} fallos en las últimas 24 h`}
+            </span>
+          </p>
+        ) : (
+          <p className="font-semibold text-red-700">⚠️ El cobro automático aún no ha corrido.</p>
+        )}
+      </div>
+      {upcoming.length === 0 ? (
+        <p className="mb-10 text-sm text-zinc-500">No hay cobros programados.</p>
+      ) : (
+        <ul className="card mb-10 divide-y divide-zinc-100">
+          {upcoming.map((u) => {
+            const s = subs.find((x) => x.id === u.subscription_id);
+            const ok = u.has_source && !u.cancel_at_period_end && u.next_charge_at;
+            return (
+              <li key={u.subscription_id} className="flex flex-wrap items-center gap-3 px-4 py-3 text-sm">
+                <span className="min-w-0 flex-1 font-medium">{s ? nameOf(s.user_id) : "Alumno"}<span className="block text-xs font-normal text-zinc-500">{s?.customer_email}</span></span>
+                {ok ? (
+                  <>
+                    <span className="text-zinc-600">{fmtDateTime(u.next_charge_at!)}</span>
+                    <span className="font-semibold">{formatCop(u.amount_cop)}</span>
+                    <span className="chip bg-emerald-100 text-emerald-800">✅ Se cobra solo · {u.payment_method === "CARD" ? "Tarjeta" : "Nequi"}</span>
+                  </>
+                ) : u.cancel_at_period_end ? (
+                  <span className="chip bg-zinc-100 text-zinc-600">Cancelada: no se cobra más</span>
+                ) : !u.has_source ? (
+                  <span className="chip bg-red-100 text-red-700">⚠️ Sin medio de pago guardado: no se puede cobrar solo</span>
+                ) : (
+                  <span className="chip bg-amber-100 text-amber-800">Sin fecha de cobro (reintentos agotados)</span>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
 
       {/* ------------------------------------------------------------ Planes */}
       <h2 className="mb-3 text-lg font-bold">Plan y precio</h2>

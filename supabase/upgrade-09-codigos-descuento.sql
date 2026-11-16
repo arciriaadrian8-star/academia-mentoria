@@ -198,3 +198,32 @@ begin
   end if;
 end;
 $$;
+
+-- ------------------------------------------- (upgrade 12) panel de cobros automáticos
+create or replace function public.admin_upcoming_charges()
+returns table (subscription_id uuid, next_charge_at timestamptz, amount_cop integer, has_source boolean, payment_method text, cancel_at_period_end boolean, status text)
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not public.is_admin() then raise exception 'sin_permiso'; end if;
+  return query
+    select s.id, s.next_charge_at, public.subscription_charge_amount(s.id), coalesce(s.payment_source_id ~ '^[0-9]+$', false),
+           s.payment_method, s.cancel_at_period_end, s.status
+      from public.subscriptions s where s.status in ('activa', 'en_mora') order by s.next_charge_at nulls last;
+end;
+$$;
+create or replace function public.admin_billing_health()
+returns table (last_run timestamptz, last_status text, runs_24h integer, failed_24h integer)
+language plpgsql stable security definer set search_path = public, cron as $$
+begin
+  if not public.is_admin() then raise exception 'sin_permiso'; end if;
+  return query
+    select (select d.start_time from cron.job_run_details d join cron.job j on j.jobid = d.jobid where j.jobname = 'cobros-membresia' order by d.start_time desc limit 1),
+           (select d.status from cron.job_run_details d join cron.job j on j.jobid = d.jobid where j.jobname = 'cobros-membresia' order by d.start_time desc limit 1),
+           (select count(*)::int from cron.job_run_details d join cron.job j on j.jobid = d.jobid where j.jobname = 'cobros-membresia' and d.start_time > now() - interval '24 hours'),
+           (select count(*)::int from cron.job_run_details d join cron.job j on j.jobid = d.jobid where j.jobname = 'cobros-membresia' and d.start_time > now() - interval '24 hours' and d.status <> 'succeeded');
+end;
+$$;
+revoke execute on function public.admin_upcoming_charges() from public, anon;
+grant execute on function public.admin_upcoming_charges() to authenticated;
+revoke execute on function public.admin_billing_health() from public, anon;
+grant execute on function public.admin_billing_health() to authenticated;

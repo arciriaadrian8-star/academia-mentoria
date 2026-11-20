@@ -16,7 +16,7 @@ const PLANS = [
     benefits: [
       "Todo lo del plan mensual",
       "1 llamada 1 a 1 conmigo cada semestre",
-      "Google Pro",
+      "Soporte 24/7 para tus dudas",
       "Acceso anticipado a los nuevos agentes de IA",
       "Acceso exclusivo a eventos presenciales",
     ],
@@ -32,9 +32,11 @@ const PLANS = [
     badge: null,
     benefits: [
       "Comunidad privada MakeDrop IA en Skool",
-      "6 agentes de IA",
-      "6 clases",
-      "4 llamadas en vivo al mes conmigo y expertos",
+      "Clases en vivo donde revisamos tu tienda y tus procesos",
+      "Clases de escalado de anuncios",
+      "Productos ganadores cada semana",
+      "Actualización de módulos cada semana",
+      "Casos de éxito reales, como los de Emilio y Jorge",
     ],
     checkout: "https://whop.com/checkout/plan_TCtvoJbQp3WGF",
     featured: false,

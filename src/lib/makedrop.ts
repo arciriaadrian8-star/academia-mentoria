@@ -12,6 +12,8 @@ export const MAKEDROP = {
     { src: `${SKOOL_ASSETS}/46f7187256c4410da949d57c69306e23f1053bd6f7af4fee9acd446af1778334.png`, alt: "Preguntas frecuentes de MakeDrop IA" },
   ],
   skoolUrl: "https://www.skool.com/adriang-society-6943",
+  /** Video de la academia que se muestra en /membresia. */
+  video: "https://drive.google.com/file/d/135J3C3eHMid50obUZ8l5xu-gC-l8UboK/view?usp=sharing",
   whatsapp: "573208652165",
 } as const;
 

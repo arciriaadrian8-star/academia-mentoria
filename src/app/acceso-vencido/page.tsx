@@ -15,10 +15,10 @@ export default async function ExpiredPage() {
   return (
     <AuthCard settings={settings} title="Tu acceso al Kit COD venció">
       <p className="mb-5 text-center text-sm text-zinc-600">
-        Venció el {formatAccessDate(profile.access_until!)}. Renueva con Nequi o escribe un código nuevo para seguir usando las herramientas. Tu
+        Venció el {formatAccessDate(profile.access_until!)}. Renueva tu membresía o escribe un código nuevo para seguir usando las herramientas. Tu
         historial de guiones se mantiene.
       </p>
-      <Link href="/membresia" className="btn btn-primary mb-4 w-full">Renovar con Nequi (cobro automático)</Link>
+      <Link href="/membresia" className="btn btn-primary mb-4 w-full">Renovar mi membresía</Link>
       <p className="mb-3 text-center text-xs text-zinc-500">¿Tienes un código? Escríbelo aquí:</p>
       <RenewForm />
       <form action={signOut} className="mt-3">

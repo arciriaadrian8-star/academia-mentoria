@@ -3,8 +3,16 @@ import { MAKEDROP, whatsappLink } from "@/lib/makedrop";
 import { getVideoEmbed } from "@/lib/video";
 import { LaunchCountdown } from "./LaunchCountdown";
 
-/** Fin real del precio de lanzamiento (hora Colombia). Después de esta fecha hay que subir los precios en Whop. */
-const LAUNCH_ENDS_AT = "2026-11-22T23:59:59-05:00";
+const drive = (id: string) => `https://drive.google.com/thumbnail?id=${id}&sz=w1200`;
+
+/** Casos de éxito (capturas sin datos de clientes). */
+const CASES = [
+  { title: "Emilio", text: "Su proceso en la mentoría y el crecimiento de sus pedidos en Shopify, contado por él mismo.", img: drive("1T7XX9NOwyLvdfTudtxj1Zblf5cEtmK71") },
+  { title: "Jorge", text: "Llegó sin ventas y en su primera etapa ya celebró su primera venta con su tienda.", img: null },
+  { title: "Fabián", text: "\"Cayó un pedido masivo\": así me escribió Fabián cuando le empezaron a entrar pedidos grandes.", img: drive("1FE55Ytjn-nSLgLNhqQi_dWCDi3FB3MXY") },
+  { title: "$2,2 millones COP en ventas", text: "Ventas totales de la tienda de un estudiante en Shopify.", img: drive("1Z2qtccIVputhpl11cMA3BA5Qst-YUxYl") },
+  { title: "Pedidos todos los días", text: "Lista de pedidos contra entrega de un estudiante.", img: drive("1mbhuYe04Xs4IwORgE0oL8tSsBgQwKFI6") },
+] as const;
 
 export const metadata = { title: "MakeDrop IA | Membresía" };
 
@@ -79,8 +87,10 @@ export default function MembershipPage() {
           </section>
         )}
 
-        <LaunchCountdown endsAt={LAUNCH_ENDS_AT} />
-
+        <LaunchCountdown
+          minutes={15}
+          whatsappUrl={whatsappLink(MAKEDROP.whatsapp, "Hola Adrián 👋 Se me acabó el tiempo del precio de lanzamiento de MakeDrop IA. ¿Todavía queda cupo?")}
+        >
         <section id="planes" className="grid gap-4 sm:grid-cols-2">
           {PLANS.map((plan) => (
             <div
@@ -115,6 +125,7 @@ export default function MembershipPage() {
         <p className="mt-3 flex items-center justify-center gap-1.5 text-center text-xs text-zinc-500">
           <ShieldCheck className="size-4" /> Pago seguro con Whop. Aceptamos tarjetas de crédito y débito de cualquier país.
         </p>
+        </LaunchCountdown>
 
         <section className="card mt-8 p-6">
           <h2 className="text-lg font-bold">¿Ya pagaste? Así entras a la comunidad</h2>
@@ -152,6 +163,21 @@ export default function MembershipPage() {
           <a href={waLink} target="_blank" rel="noopener noreferrer" className="btn btn-primary mt-6 w-full">
             <MessageCircle className="size-4" /> Ya pagué: escribir por WhatsApp
           </a>
+        </section>
+
+        <section className="mt-10">
+          <h2 className="mb-4 text-center text-2xl font-bold">Casos de éxito</h2>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {CASES.map((c) => (
+              <div key={c.title} className="card overflow-hidden">
+                {c.img && <img src={c.img} alt={`Caso de éxito: ${c.title}`} loading="lazy" className="w-full bg-zinc-100 object-cover" />}
+                <div className="p-4">
+                  <p className="font-bold">{c.title}</p>
+                  <p className="mt-1 text-sm text-zinc-600">{c.text}</p>
+                </div>
+              </div>
+            ))}
+          </div>
         </section>
 
         <section className="mt-10 space-y-4">

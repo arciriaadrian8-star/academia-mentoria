@@ -9,10 +9,17 @@ const PLANS = [
   {
     id: "anual",
     name: "Plan anual",
-    price: "$139",
+    price: "$99",
     period: "USD / año",
-    note: "Equivale a $11,58 USD al mes. Pagas una vez y tienes acceso todo el año.",
-    badge: "Más elegido · Ahorra 52%",
+    note: "Equivale a $8,25 USD al mes. Pagas una vez y tienes acceso todo el año.",
+    badge: "Más elegido · Ahorra 66%",
+    benefits: [
+      "Todo lo del plan mensual",
+      "1 llamada 1 a 1 conmigo cada semestre",
+      "Google Pro",
+      "Acceso anticipado a los nuevos agentes de IA",
+      "Acceso exclusivo a eventos presenciales",
+    ],
     checkout: "https://whop.com/checkout/plan_ItnqYxPrFUrpA",
     featured: true,
   },
@@ -23,6 +30,12 @@ const PLANS = [
     period: "USD / mes",
     note: "Cobro automático cada mes con tu tarjeta.",
     badge: null,
+    benefits: [
+      "Comunidad privada MakeDrop IA en Skool",
+      "6 agentes de IA",
+      "6 clases",
+      "4 llamadas en vivo al mes conmigo y expertos",
+    ],
     checkout: "https://whop.com/checkout/plan_TCtvoJbQp3WGF",
     featured: false,
   },
@@ -75,6 +88,13 @@ export default function MembershipPage() {
                 <span className="ml-1 text-sm font-medium text-zinc-500">{plan.period}</span>
               </p>
               <p className="mt-2 text-sm text-zinc-600">{plan.note}</p>
+              <ul className="mt-4 space-y-2 text-sm text-zinc-700">
+                {plan.benefits.map((b) => (
+                  <li key={b} className="flex gap-2">
+                    <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-blue-600" /> {b}
+                  </li>
+                ))}
+              </ul>
               <div className="mt-auto pt-6">
                 <a href={plan.checkout} className={`btn w-full ${plan.featured ? "btn-primary" : "btn-secondary"}`}>
                   <CreditCard className="size-4" /> Pagar {plan.price} USD con tarjeta

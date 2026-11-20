@@ -1,6 +1,10 @@
 import { CheckCircle2, CreditCard, ExternalLink, MessageCircle, ShieldCheck } from "lucide-react";
 import { MAKEDROP, whatsappLink } from "@/lib/makedrop";
 import { getVideoEmbed } from "@/lib/video";
+import { LaunchCountdown } from "./LaunchCountdown";
+
+/** Fin real del precio de lanzamiento (hora Colombia). Después de esta fecha hay que subir los precios en Whop. */
+const LAUNCH_ENDS_AT = "2026-11-22T23:59:59-05:00";
 
 export const metadata = { title: "MakeDrop IA | Membresía" };
 
@@ -74,6 +78,8 @@ export default function MembershipPage() {
             </div>
           </section>
         )}
+
+        <LaunchCountdown endsAt={LAUNCH_ENDS_AT} />
 
         <section id="planes" className="grid gap-4 sm:grid-cols-2">
           {PLANS.map((plan) => (

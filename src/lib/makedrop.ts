@@ -13,7 +13,7 @@ export const MAKEDROP = {
   ],
   skoolUrl: "https://www.skool.com/adriang-society-6943",
   /** Video de la academia que se muestra en /membresia. */
-  video: "https://www.loom.com/share/a7852908015847a29f8aaa8f7847b797",
+  video: "",
   whatsapp: "573208652165",
 } as const;
 

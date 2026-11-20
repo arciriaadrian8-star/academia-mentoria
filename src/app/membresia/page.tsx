@@ -8,7 +8,7 @@ const drive = (id: string) => `https://drive.google.com/thumbnail?id=${id}&sz=w1
 /** Casos de éxito (capturas sin datos de clientes). */
 const CASES = [
   { title: "Emilio", text: "Su proceso en la mentoría y el crecimiento de sus pedidos en Shopify, contado por él mismo.", img: drive("1T7XX9NOwyLvdfTudtxj1Zblf5cEtmK71") },
-  { title: "Jorge", text: "Llegó sin ventas y en su primera etapa ya celebró su primera venta con su tienda.", img: null },
+  { title: "Jorge", text: "En octubre me escribió para celebrar la primera venta de su tienda.", img: null },
   { title: "Fabián", text: "\"Cayó un pedido masivo\": así me escribió Fabián cuando le empezaron a entrar pedidos grandes.", img: drive("1FE55Ytjn-nSLgLNhqQi_dWCDi3FB3MXY") },
   { title: "$2,2 millones COP en ventas", text: "Ventas totales de la tienda de un estudiante en Shopify.", img: drive("1Z2qtccIVputhpl11cMA3BA5Qst-YUxYl") },
   { title: "Pedidos todos los días", text: "Lista de pedidos contra entrega de un estudiante.", img: drive("1mbhuYe04Xs4IwORgE0oL8tSsBgQwKFI6") },

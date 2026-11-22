@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowLeft, CheckCircle2, Clock, XCircle } from "lucide-react";
 import { requireKit } from "@/lib/auth";
-import { LANDING_TOOL_NAME } from "@/lib/makedrop";
+import { LANDING_TOOL_NAME } from "@/lib/landing";
 import { timeAgo } from "@/lib/utils";
 import { EmptyState, PageHeader } from "@/components/PageHeader";
 import { LandingForm } from "./LandingForm";

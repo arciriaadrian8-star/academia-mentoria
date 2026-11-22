@@ -9,7 +9,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { zipSync } from "fflate";
 import { AlertTriangle, Download, FileSpreadsheet, Loader2, Palette, Store } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { buildDescriptionHtml, buildShopifyCsv, FINAL_IMAGES, fileName, LANDING_BUCKET, type LandingResult } from "@/lib/makedrop";
+import { buildDescriptionHtml, buildShopifyCsv, FINAL_IMAGES, fileName, LANDING_BUCKET, type LandingResult } from "@/lib/landing";
 import { CopyButton } from "@/components/CopyButton";
 import { composeImage, composeTrust, loadBitmap, type Brand, type Fonts } from "./compose";
 

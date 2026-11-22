@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Trash2 } from "lucide-react";
 import { requireKit } from "@/lib/auth";
-import { LANDING_BUCKET, type LandingResult } from "@/lib/makedrop";
+import { LANDING_BUCKET, type LandingResult } from "@/lib/landing";
 import { ConfirmButton } from "@/components/ConfirmButton";
 import { PageHeader } from "@/components/PageHeader";
 import { deleteLanding } from "../actions";

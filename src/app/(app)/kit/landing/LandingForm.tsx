@@ -4,7 +4,7 @@ import { startTransition, useActionState, useEffect, useState } from "react";
 import { ImagePlus, Loader2, Sparkles, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { COUNTRIES, loadLocal, saveLocal } from "@/lib/kit";
-import { AUDIENCES, LANDING_BUCKET, LANDING_MONTHLY_LIMIT } from "@/lib/makedrop";
+import { AUDIENCES, LANDING_BUCKET, LANDING_MONTHLY_LIMIT } from "@/lib/landing";
 import { FormMessage } from "@/components/FormMessage";
 import { createLanding, type LandingState } from "./actions";
 

@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { requireKit } from "@/lib/auth";
 import { formatAccessDate } from "@/lib/accessCodes";
-import { LANDING_TOOL_NAME } from "@/lib/makedrop";
+import { LANDING_TOOL_NAME } from "@/lib/landing";
 import { ROADMAP_KEYS } from "@/lib/roadmap";
 import { FormMessage } from "@/components/FormMessage";
 import { PageHeader } from "@/components/PageHeader";

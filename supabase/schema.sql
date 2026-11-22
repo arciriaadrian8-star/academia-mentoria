@@ -1095,7 +1095,7 @@ revoke execute on function public.redeem_access_code(text, uuid) from public, an
 grant execute on function public.redeem_access_code(text, uuid) to service_role;
 
 -- =====================================================================
--- Upgrade 05 · MakeDrop Landing (landing completa para Shopify con IA)
+-- Upgrade 10 · MakeDrop Landing (landing completa para Shopify con IA)
 --   - ai_landings: cada landing que pide un alumno (texto + imágenes con Gemini).
 --   - Bucket privado "makedrop": fotos del alumno, imágenes de la IA y las finales.
 --   Requiere haber aplicado antes upgrade-04-acceso-kit.sql (usa has_kit()).

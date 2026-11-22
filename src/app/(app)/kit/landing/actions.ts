@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireKit } from "@/lib/auth";
 import { COUNTRIES } from "@/lib/kit";
-import { AUDIENCES, LANDING_BUCKET, LANDING_MONTHLY_LIMIT } from "@/lib/makedrop";
+import { AUDIENCES, LANDING_BUCKET, LANDING_MONTHLY_LIMIT } from "@/lib/landing";
 import { str, strOrNull } from "@/lib/utils";
 
 export type LandingState = { error?: string } | null;

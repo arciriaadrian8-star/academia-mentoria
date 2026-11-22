@@ -3,6 +3,7 @@ import {
   BarChart3,
   Calculator,
   ClipboardCheck,
+  LayoutTemplate,
   LayoutGrid,
   LineChart,
   MessageCircle,
@@ -14,6 +15,7 @@ import {
 } from "lucide-react";
 import { requireKit } from "@/lib/auth";
 import { formatAccessDate } from "@/lib/accessCodes";
+import { LANDING_TOOL_NAME } from "@/lib/makedrop";
 import { ROADMAP_KEYS } from "@/lib/roadmap";
 import { FormMessage } from "@/components/FormMessage";
 import { PageHeader } from "@/components/PageHeader";
@@ -21,6 +23,14 @@ import { RenewForm } from "@/app/kit-acceso/RenewForm";
 
 /** Las herramientas con `kitOnly` son las que ven las cuentas «Solo Kit» (acceso con código). */
 const TOOLS: { href: string; title: string; text: string; icon: typeof Wand2; tag: string; kitOnly?: boolean }[] = [
+  {
+    href: "/kit/landing",
+    kitOnly: true,
+    title: LANDING_TOOL_NAME,
+    text: "Sube la foto de tu producto y tu oferta: la IA te arma la landing completa para Shopify con imágenes, reseñas y preguntas frecuentes.",
+    icon: LayoutTemplate,
+    tag: "IA en vivo",
+  },
   {
     href: "/kit/video-ia",
     kitOnly: true,

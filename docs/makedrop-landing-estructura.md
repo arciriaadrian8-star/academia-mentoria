@@ -50,3 +50,40 @@ Principal con etiquetas de beneficios · Producto en uso (estilo de vida) · Esc
 - Reseñas: reales que pegue el alumno, o de ejemplo con aviso visible ("ejemplos ilustrativos").
 - Antes y después: escena ilustrativa, nunca resultados falsos en cuerpo, piel o peso.
 - No inventar descuentos, stock, urgencias ni garantías que el alumno no tenga.
+
+## 3. ESTRUCTURA DEFINITIVA (referencia: nuxverse.com/products/lullabites)
+
+Es la que sigue el agente. Todo el texto va en la **descripción del producto** (centrado), así entra completo a Shopify con el archivo de importación.
+
+### Barra de anuncio
+`🎁 HOY ENVÍO GRATIS + PAGA AL RECIBIR 🚚`
+
+### Título (sección 1)
+`NOMBRE™ Original: [qué es] que [beneficio 1], [beneficio 2] y [beneficio 3].`
+Ej.: *RelaGum LullaBites™ Original: Gomitas relajantes que ayudan con el sueño, reducen estrés y ayudan a despertar renovado.*
+
+### Precio
+Precio de hoy + precio antes tachado (en el ejemplo: $74.899 vs $169.800).
+
+### Galería: 5 imágenes cuadradas 1:1 (1080×1080), todas con el mismo sello de marca
+Elementos fijos en cada imagen: sello estrella "SÚPER PROMO" o "MEGA OFERTA" arriba + franja "🚚 ENVÍO GRATIS · 🏠 PAGO CONTRAENTREGA" abajo.
+1. **Principal:** persona sonriendo con el producto en la mano + recuadro con nombre y beneficio corto.
+2. **Beneficios:** infografía "BENEFICIOS:" con 5 beneficios con ícono + el producto.
+3. **Uso 1:** persona usando el producto (disfrutándolo).
+4. **Producto protagonista:** foto premium del producto solo, fondo oscuro/elegante + "MEGA OFERTA".
+5. **Uso 2:** otra persona usando el producto.
+
+### Descripción: 6 bloques, cada uno con título H1 centrado entre emojis + texto corto + imagen
+1. 🔥 **Pregunta que duele** ("¿Te cuesta…?") + párrafo empático que termina en "no estás solo" + **GIF del producto en uso** (real).
+2. ✨ **Producto™: la promesa** ("el ritual que te lleva…") + cómo funciona / de qué está hecho + "sin X, sin Y" + imagen.
+3. 🛡 **Fórmula / por qué funciona** + 3 beneficios con ➡️ (Beneficio: explicación) + imagen.
+4. 🍃 **Tu nuevo hábito / la transformación** (cómo cambia su día) + imagen.
+5. 📦 **Cómo usarlo para mejores resultados** + 3 pasos 1️⃣ 2️⃣ 3️⃣ + imagen.
+6. 🏡 **Te acompaña donde vayas / cierre** + llamado a comprar ("¡Añádelo al carrito ahora!") + **imagen de confianza**: logo de la tienda + "✔ Compra verificada" + "Te contactaremos para confirmar tu compra".
+
+Las imágenes de la descripción reutilizan las de la galería (en el ejemplo: GIF, 4, 5, 4, 3 y la de confianza).
+
+### Cómo lo hace el agente
+- Nano Banana genera solo las fotos limpias (persona con producto, uso, producto premium, fondo para beneficios), usando la foto del alumno como referencia.
+- Los sellos, la franja, la lista de beneficios y la imagen de confianza se dibujan con código, así el texto sale siempre perfecto y con los colores de la tienda.
+- GIF: opcional, lo sube el alumno (video corto real del producto). Si no hay, va una imagen de uso.

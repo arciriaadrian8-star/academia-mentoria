@@ -1,0 +1,199 @@
+import { CheckCircle2, CreditCard, ExternalLink, MessageCircle, ShieldCheck } from "lucide-react";
+import { MAKEDROP, whatsappLink } from "@/lib/makedrop";
+import { getVideoEmbed } from "@/lib/video";
+import { LaunchCountdown } from "./LaunchCountdown";
+
+const drive = (id: string) => `https://drive.google.com/thumbnail?id=${id}&sz=w1200`;
+
+/** Casos de éxito (capturas sin datos de clientes). */
+const CASES = [
+  { title: "Emilio", text: "Su proceso en la mentoría y el crecimiento de sus pedidos en Shopify, contado por él mismo.", img: drive("1T7XX9NOwyLvdfTudtxj1Zblf5cEtmK71") },
+  { title: "Jorge", text: "En octubre me escribió para celebrar la primera venta de su tienda.", img: null },
+  { title: "Fabián", text: "\"Cayó un pedido masivo\": así me escribió Fabián cuando le empezaron a entrar pedidos grandes.", img: drive("1FE55Ytjn-nSLgLNhqQi_dWCDi3FB3MXY") },
+  { title: "$2,2 millones COP en ventas", text: "Ventas totales de la tienda de un estudiante en Shopify.", img: drive("1Z2qtccIVputhpl11cMA3BA5Qst-YUxYl") },
+  { title: "Pedidos todos los días", text: "Lista de pedidos contra entrega de un estudiante.", img: drive("1mbhuYe04Xs4IwORgE0oL8tSsBgQwKFI6") },
+] as const;
+
+export const metadata = { title: "MakeDrop IA | Membresía" };
+
+/** Pagos con Whop (tarjeta, también internacional). Precios en dólares. */
+const PLANS = [
+  {
+    id: "anual",
+    name: "Plan anual",
+    price: "$99",
+    period: "USD / año",
+    note: "Equivale a $8,25 USD al mes. Pagas una vez y tienes acceso todo el año.",
+    badge: "Más elegido · Ahorra 66%",
+    benefits: [
+      "Todo lo del plan mensual",
+      "1 llamada 1 a 1 conmigo cada semestre",
+      "Soporte 24/7 para tus dudas",
+      "Acceso anticipado a los nuevos agentes de IA",
+      "Acceso exclusivo a eventos presenciales",
+    ],
+    checkout: "https://whop.com/checkout/plan_ItnqYxPrFUrpA",
+    featured: true,
+  },
+  {
+    id: "mensual",
+    name: "Plan mensual",
+    price: "$24",
+    period: "USD / mes",
+    note: "Cobro automático cada mes con tu tarjeta.",
+    badge: null,
+    benefits: [
+      "Comunidad privada MakeDrop IA en Skool",
+      "Clases en vivo donde revisamos tu tienda y tus procesos",
+      "Clases de escalado de anuncios",
+      "Productos ganadores cada semana",
+      "Actualización de módulos cada semana",
+      "Casos de éxito reales, como los de Emilio y Jorge",
+    ],
+    checkout: "https://whop.com/checkout/plan_TCtvoJbQp3WGF",
+    featured: false,
+  },
+] as const;
+
+/* eslint-disable @next/next/no-img-element */
+export default function MembershipPage() {
+  const video = getVideoEmbed(MAKEDROP.video);
+  const waLink = whatsappLink(
+    MAKEDROP.whatsapp,
+    "Hola Adrián 👋 Ya pagué MakeDrop IA en Whop. Mi nombre es ____ y mi correo de Skool es: ____",
+  );
+
+  return (
+    <div className="min-h-screen bg-zinc-50">
+      <header className="border-b border-zinc-200 bg-white">
+        <div className="mx-auto flex max-w-3xl items-center gap-2.5 px-4 py-3">
+          <img src={MAKEDROP.logo} alt="" className="size-9 rounded-lg object-cover" />
+          <span className="font-bold tracking-tight">{MAKEDROP.fullName}</span>
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-3xl px-4 py-8">
+        <img src={MAKEDROP.hero} alt="MakeDrop IA: tus primeras 100 ventas en 90 días" className="mb-8 w-full rounded-2xl shadow-sm" />
+
+        {video && (
+          <section className="mb-8 overflow-hidden rounded-2xl bg-black shadow-sm">
+            <div className="aspect-video">
+              {video.type === "iframe" ? (
+                <iframe src={video.src} title="Video de MakeDrop IA" className="size-full" allow="autoplay; fullscreen; picture-in-picture" allowFullScreen />
+              ) : (
+                <video src={video.src} controls playsInline className="size-full" />
+              )}
+            </div>
+          </section>
+        )}
+
+        <LaunchCountdown
+          minutes={15}
+          whatsappUrl={whatsappLink(MAKEDROP.whatsapp, "Hola Adrián 👋 Se me acabó el tiempo del precio de lanzamiento de MakeDrop IA. ¿Todavía queda cupo?")}
+        >
+        <section id="planes" className="grid gap-4 sm:grid-cols-2">
+          {PLANS.map((plan) => (
+            <div
+              key={plan.id}
+              className={`card flex flex-col p-6 ${plan.featured ? "ring-2 ring-blue-600" : ""}`}
+            >
+              {plan.badge && (
+                <span className="chip mb-3 w-fit bg-blue-600 font-semibold text-white">{plan.badge}</span>
+              )}
+              <h2 className="text-xl font-bold">{plan.name}</h2>
+              <p className="mt-2 text-4xl font-bold tracking-tight">
+                {plan.price}
+                <span className="ml-1 text-sm font-medium text-zinc-500">{plan.period}</span>
+              </p>
+              <p className="mt-2 text-sm text-zinc-600">{plan.note}</p>
+              <ul className="mt-4 space-y-2 text-sm text-zinc-700">
+                {plan.benefits.map((b) => (
+                  <li key={b} className="flex gap-2">
+                    <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-blue-600" /> {b}
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-auto pt-6">
+                <a href={plan.checkout} className={`btn w-full ${plan.featured ? "btn-primary" : "btn-secondary"}`}>
+                  <CreditCard className="size-4" /> Pagar {plan.price} USD con tarjeta
+                </a>
+              </div>
+            </div>
+          ))}
+        </section>
+
+        <p className="mt-3 flex items-center justify-center gap-1.5 text-center text-xs text-zinc-500">
+          <ShieldCheck className="size-4" /> Pago seguro con Whop. Aceptamos tarjetas de crédito y débito de cualquier país.
+        </p>
+        </LaunchCountdown>
+
+        <section className="card mt-8 p-6">
+          <h2 className="text-lg font-bold">¿Ya pagaste? Así entras a la comunidad</h2>
+          <ol className="mt-4 space-y-4 text-sm text-zinc-700">
+            <li className="flex gap-3">
+              <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">1</span>
+              <span>
+                <b>Paga tu plan en Whop</b> con el botón de arriba. Usa un correo que revises, porque con ese mismo correo
+                te vamos a invitar.
+              </span>
+            </li>
+            <li className="flex gap-3">
+              <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">2</span>
+              <span>
+                <b>Crea tu cuenta gratis en Skool</b> con ese mismo correo, si todavía no tienes una.{" "}
+                <a href="https://www.skool.com/signup" target="_blank" rel="noopener noreferrer" className="font-semibold text-blue-600 hover:underline">
+                  Crear cuenta en skool.com <ExternalLink className="inline size-3" />
+                </a>
+              </span>
+            </li>
+            <li className="flex gap-3">
+              <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">3</span>
+              <span>
+                <b>Escríbeme por WhatsApp</b> con tu nombre y tu correo de Skool. Toca el botón y el mensaje ya sale escrito:
+                solo completa tus datos.
+              </span>
+            </li>
+            <li className="flex gap-3">
+              <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">4</span>
+              <span>
+                <b>Acepta la invitación</b> que te llega a tu correo y entra a la comunidad privada de MakeDrop IA en Skool.
+              </span>
+            </li>
+          </ol>
+          <a href={waLink} target="_blank" rel="noopener noreferrer" className="btn btn-primary mt-6 w-full">
+            <MessageCircle className="size-4" /> Ya pagué: escribir por WhatsApp
+          </a>
+        </section>
+
+        <section className="mt-10">
+          <h2 className="mb-4 text-center text-2xl font-bold">Casos de éxito</h2>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {CASES.map((c) => (
+              <div key={c.title} className="card overflow-hidden">
+                {c.img && <img src={c.img} alt={`Caso de éxito: ${c.title}`} loading="lazy" className="w-full bg-zinc-100 object-cover" />}
+                <div className="p-4">
+                  <p className="font-bold">{c.title}</p>
+                  <p className="mt-1 text-sm text-zinc-600">{c.text}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="mt-10 space-y-4">
+          {MAKEDROP.gallery.map((img) => (
+            <img key={img.src} src={img.src} alt={img.alt} loading="lazy" className="w-full rounded-2xl shadow-sm" />
+          ))}
+        </section>
+
+        <div className="mt-8 text-center">
+          <a href="#planes" className="btn btn-primary">
+            <CheckCircle2 className="size-4" /> Quiero entrar a MakeDrop IA
+          </a>
+        </div>
+
+        <p className="mt-10 text-center text-xs text-zinc-400">Pagos procesados de forma segura por Whop. Precios en dólares (USD).</p>
+      </main>
+    </div>
+  );
+}

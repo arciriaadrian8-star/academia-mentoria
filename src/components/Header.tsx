@@ -1,3 +1,4 @@
+import { MAKEDROP } from "@/lib/makedrop";
 import Link from "next/link";
 import { ROLE_LABELS } from "@/lib/constants";
 import type { Profile, Settings } from "@/lib/types";
@@ -37,7 +38,11 @@ export function Header({
     <header className="sticky top-0 z-30 border-b border-zinc-200 bg-white/95 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 pt-3">
         <Link href={isKitOnly ? "/kit" : "/"} className="flex min-w-0 items-center gap-3">
-          {settings.logo_url ? (
+          {isKitOnly ? (
+            // Las cuentas «Solo Kit» son de MakeDrop IA: ven esa marca, no la de la academia.
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={MAKEDROP.logo} alt="" className="size-9 rounded-lg object-cover" />
+          ) : settings.logo_url ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={settings.logo_url} alt="" className="size-9 rounded-lg object-cover" />
           ) : (
@@ -45,7 +50,7 @@ export function Header({
               {settings.academy_name.charAt(0)}
             </span>
           )}
-          <span className="truncate text-lg font-bold tracking-tight">{settings.academy_name}</span>
+          <span className="truncate text-lg font-bold tracking-tight">{isKitOnly ? MAKEDROP.fullName : settings.academy_name}</span>
         </Link>
 
         <UserMenu

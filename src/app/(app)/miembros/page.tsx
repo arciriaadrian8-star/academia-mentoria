@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { KeyRound, Layers, Plus, Search, Users } from "lucide-react";
+import { KeyRound, Layers, Plus, Search, Users, CreditCard } from "lucide-react";
 import { isKitExpired, requireAdmin } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ROLE_LABELS } from "@/lib/constants";
@@ -36,6 +36,9 @@ export default async function MembersPage({ searchParams }: { searchParams: Prom
   return (
     <>
       <PageHeader title="Miembros" description="Da acceso a tus alumnos y decide qué contenido ve cada uno.">
+        <Link href="/miembros/membresias" className="btn btn-secondary">
+          <CreditCard className="size-4" /> Membresías Nequi
+        </Link>
         <Link href="/miembros/codigos" className="btn btn-secondary">
           <KeyRound className="size-4" /> Códigos Kit COD
         </Link>

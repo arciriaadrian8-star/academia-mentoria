@@ -183,3 +183,35 @@ export function buildShopifyCsv(opts: {
   // BOM para que Excel y Shopify lean bien las tildes y los emojis.
   return "\uFEFF" + [header, ...rows].map((row) => row.map(csvCell).join(",")).join("\r\n") + "\r\n";
 }
+
+/** Prompt para que el alumno saque la descripción de su producto con ChatGPT o Gemini (solo pone el nombre y el país). */
+export function descriptionPrompt(product: string, country: string) {
+  const name = product.trim() || "[NOMBRE DEL PRODUCTO]";
+  const pais = country.trim() || "Colombia";
+  return `Actúa como experto en productos ganadores para tiendas de contra entrega en ${pais}.
+
+Producto: ${name}
+Mercado: ${pais}
+(Si te adjunto una foto, úsala para identificar el producto exacto).
+
+1. Identifica exactamente qué producto es.
+2. Investiga cómo se vende este producto en el mercado de ${pais} (tiendas online, Mercado Libre, Falabella, anuncios en Facebook, Instagram y TikTok).
+3. Con eso, escríbeme una descripción CLARA Y REAL del producto para pegarla en un formulario. No es un texto de venta: es la información del producto.
+
+Usa exactamente este formato, una línea por punto:
+
+Qué es:
+Problema que resuelve a los compradores en ${pais}:
+Para quién es:
+Características principales (materiales, ingredientes o tecnología):
+Cómo se usa:
+Qué incluye:
+Medidas, tallas, colores o presentación:
+Lo que más valoran los compradores en ${pais}:
+
+Reglas:
+- Usa solo información real del producto y de cómo se vende en ${pais}. No inventes ingredientes, materiales, medidas, certificaciones ni resultados.
+- Si un dato no lo encuentras, escribe "No especificado".
+- Español sencillo de ${pais}, frases cortas, sin emojis y sin exagerar.
+- Máximo 1.200 caracteres en total.`;
+}

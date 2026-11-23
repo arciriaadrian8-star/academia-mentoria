@@ -4,7 +4,8 @@ import { startTransition, useActionState, useEffect, useState } from "react";
 import { Check, ImagePlus, Loader2, Sparkles, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { COUNTRIES, loadLocal, saveLocal } from "@/lib/kit";
-import { AUDIENCES, BRAND_COLORS, DEFAULT_COLOR, LANDING_BUCKET, LANDING_MONTHLY_LIMIT } from "@/lib/landing";
+import { AUDIENCES, BRAND_COLORS, DEFAULT_COLOR, descriptionPrompt, LANDING_BUCKET, LANDING_MONTHLY_LIMIT } from "@/lib/landing";
+import { CopyButton } from "@/components/CopyButton";
 import { FormMessage } from "@/components/FormMessage";
 import { createLanding, type LandingState } from "./actions";
 
@@ -69,6 +70,8 @@ export function LandingForm({ userId, used }: { userId: string; used: number | n
   const [color, setColor] = useState<string>(DEFAULT_COLOR);
   const [fromPhoto, setFromPhoto] = useState<string | null>(null);
   const [colorTouched, setColorTouched] = useState(false);
+  const [productName, setProductName] = useState("");
+  const [country, setCountry] = useState("Colombia");
 
   useEffect(() => {
     setStoreName(loadLocal<string>("md-store-name") ?? "");
@@ -171,22 +174,44 @@ export function LandingForm({ userId, used }: { userId: string; used: number | n
 
       {/* 2. Descripción */}
       <div>
-        <label className="label" htmlFor="description">2. Descripción del producto</label>
-        <input id="product" name="product" maxLength={120} className="input mb-2" placeholder="Nombre del producto (opcional)" />
+        <label className="label" htmlFor="product">2. Nombre del producto</label>
+        <input
+          id="product"
+          name="product"
+          maxLength={120}
+          className="input"
+          placeholder="Ej: Faja reductora de cintura"
+          value={productName}
+          onChange={(e) => setProductName(e.target.value)}
+        />
+      </div>
+      <div>
+        <label className="label" htmlFor="description">3. Descripción del producto</label>
+        <div className="mb-2 rounded-xl bg-brand/5 p-3 text-xs text-zinc-700">
+          <p className="font-semibold text-zinc-900">¿No sabes qué escribir? Sácala con IA en 1 minuto:</p>
+          <ol className="mt-1 list-decimal space-y-0.5 pl-4">
+            <li>Escribe arriba el nombre del producto (el país es {country}).</li>
+            <li>Copia el prompt y pégalo en ChatGPT o Gemini con la búsqueda en internet activada (puedes adjuntar la foto).</li>
+            <li>Pega aquí abajo lo que te responda.</li>
+          </ol>
+          <div className="mt-2">
+            <CopyButton text={descriptionPrompt(productName, country)} label="Copiar prompt" />
+          </div>
+        </div>
         <textarea
           id="description"
           name="description"
           required
-          rows={4}
+          rows={5}
           maxLength={2000}
           className="input"
           placeholder="Qué es, qué problema resuelve, de qué está hecho, cómo se usa y qué incluye"
         />
       </div>
 
-      {/* 3. Oferta */}
+      {/* 4. Oferta */}
       <div>
-        <p className="label">3. Tu oferta</p>
+        <p className="label">4. Tu oferta</p>
         <div className="grid grid-cols-2 gap-3">
           <input name="price" required maxLength={40} className="input" placeholder="Precio hoy: $79.900" aria-label="Precio de venta" />
           <input name="compare_price" maxLength={40} className="input" placeholder="Precio antes: $159.900" aria-label="Precio antes" />
@@ -194,9 +219,9 @@ export function LandingForm({ userId, used }: { userId: string; used: number | n
         <input name="offer" maxLength={200} className="input mt-2" placeholder="Envío gratis + pago contra entrega + regalo" aria-label="Oferta" />
       </div>
 
-      {/* 4. Colores */}
+      {/* 5. Colores */}
       <div>
-        <p className="label">4. Color de tu página</p>
+        <p className="label">5. Color de tu página</p>
         <div className="flex flex-wrap items-center gap-2">
           {swatches.map((c) => (
             <button
@@ -227,7 +252,7 @@ export function LandingForm({ userId, used }: { userId: string; used: number | n
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="label" htmlFor="country">País</label>
-              <select id="country" name="country" className="input" defaultValue="Colombia">
+              <select id="country" name="country" className="input" value={country} onChange={(e) => setCountry(e.target.value)}>
                 {COUNTRIES.map((c) => (
                   <option key={c}>{c}</option>
                 ))}

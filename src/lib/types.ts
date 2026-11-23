@@ -31,9 +31,11 @@ export interface Settings {
   welcome_message: string | null;
   allow_signup: boolean;
   auto_approve: boolean;
-  /** Landings con IA cada 30 días: academia (rol kit) y mentoría 1 a 1 (rol member). */
-  landing_limit_kit: number;
-  landing_limit_member: number;
+  /** MakeDrop Landing: % del pago mensual de cada alumno que puede gastar en IA, modelo de imágenes y pago por defecto. */
+  landing_budget_pct: number;
+  landing_image_model: string;
+  landing_default_usd_kit: number;
+  landing_default_usd_member: number;
 }
 
 export interface Course {

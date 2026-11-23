@@ -1,10 +1,30 @@
 /** MakeDrop Landing: tipos, plantilla HTML de la descripción y archivo de importación para Shopify. */
 
 export const LANDING_TOOL_NAME = "MakeDrop Landing";
-/** Landings cada 30 días según el tipo de alumno (null = sin límite: admin y coaches). */
-export function landingLimit(role: string, settings: { landing_limit_kit: number; landing_limit_member: number }) {
-  if (role === "admin" || role === "coach") return null;
-  return role === "kit" ? settings.landing_limit_kit : settings.landing_limit_member;
+/** Modelos de imágenes y su costo aproximado por landing (5 fotos + texto), en USD. */
+export const IMAGE_MODELS = [
+  { id: "gemini-3.1-flash-image-preview", label: "Nano Banana 2 · mejor calidad", costUsd: 0.4 },
+  { id: "gemini-2.5-flash-image", label: "Nano Banana · más económico", costUsd: 0.2 },
+] as const;
+export const landingCost = (model: string) => IMAGE_MODELS.find((m) => m.id === model)?.costUsd ?? IMAGE_MODELS[0].costUsd;
+
+type BudgetSettings = {
+  landing_budget_pct: number;
+  landing_image_model: string;
+  landing_default_usd_kit: number;
+  landing_default_usd_member: number;
+};
+
+/**
+ * Cuántas landings puede crear un alumno cada 30 días: el % (por defecto 3 %) de lo que paga al mes,
+ * dividido por lo que cuesta cada landing. Admin y coaches no tienen límite (limit = null).
+ */
+export function landingAllowance(role: string, monthlyUsd: number | null | undefined, s: BudgetSettings) {
+  const cost = landingCost(s.landing_image_model);
+  if (role === "admin" || role === "coach") return { limit: null, monthlyUsd: null, budget: null, cost };
+  const usd = Number(monthlyUsd ?? (role === "kit" ? s.landing_default_usd_kit : s.landing_default_usd_member)) || 0;
+  const budget = (usd * Number(s.landing_budget_pct)) / 100;
+  return { limit: Math.floor(budget / cost + 1e-9), monthlyUsd: usd, budget, cost };
 }
 export const LANDING_BUCKET = "makedrop";
 

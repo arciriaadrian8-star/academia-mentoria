@@ -65,8 +65,10 @@ const DEFAULT_SETTINGS: Settings = {
   welcome_message: null,
   allow_signup: true,
   auto_approve: false,
-  landing_limit_kit: 2,
-  landing_limit_member: 10,
+  landing_budget_pct: 3,
+  landing_image_model: "gemini-3.1-flash-image-preview",
+  landing_default_usd_kit: 14,
+  landing_default_usd_member: 14,
 };
 
 export const getSettings = cache(async (): Promise<Settings> => {

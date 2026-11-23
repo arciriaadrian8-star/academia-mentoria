@@ -48,10 +48,30 @@ revoke all on public.ai_landings from anon;
 grant select, insert, delete on public.ai_landings to authenticated;
 grant all on public.ai_landings to service_role;
 
--- Límite de landings cada 30 días por tipo de alumno (el admin lo cambia en Ajustes)
+-- Presupuesto de IA: cada alumno puede gastar en landings un % de lo que paga al mes (el admin lo ajusta en Ajustes)
 alter table public.settings
-  add column if not exists landing_limit_kit int not null default 2 check (landing_limit_kit between 0 and 100),
-  add column if not exists landing_limit_member int not null default 10 check (landing_limit_member between 0 and 200);
+  add column if not exists landing_budget_pct numeric(5,2) not null default 3 check (landing_budget_pct between 0 and 100),
+  add column if not exists landing_image_model text not null default 'gemini-3.1-flash-image-preview'
+    check (landing_image_model in ('gemini-3.1-flash-image-preview', 'gemini-2.5-flash-image')),
+  add column if not exists landing_default_usd_kit numeric(10,2) not null default 14 check (landing_default_usd_kit between 0 and 100000),
+  add column if not exists landing_default_usd_member numeric(10,2) not null default 14 check (landing_default_usd_member between 0 and 100000);
+
+-- Cuánto paga cada alumno al mes (USD). Lo pone el admin en la ficha del miembro.
+create table if not exists public.member_billing (
+  user_id     uuid primary key references public.profiles(id) on delete cascade,
+  monthly_usd numeric(10,2) not null check (monthly_usd between 0 and 100000),
+  updated_at  timestamptz not null default now()
+);
+alter table public.member_billing enable row level security;
+drop policy if exists "pago mensual: admin gestiona" on public.member_billing;
+create policy "pago mensual: admin gestiona" on public.member_billing
+  for all to authenticated using (public.is_admin()) with check (public.is_admin());
+drop policy if exists "pago mensual: ver el propio" on public.member_billing;
+create policy "pago mensual: ver el propio" on public.member_billing
+  for select to authenticated using (user_id = (select auth.uid()));
+revoke all on public.member_billing from anon;
+grant select, insert, update, delete on public.member_billing to authenticated;
+grant all on public.member_billing to service_role;
 
 -- Bucket privado: cada alumno solo ve y escribe en su carpeta (<user_id>/...)
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)

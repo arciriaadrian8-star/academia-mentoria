@@ -3,11 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
+import { IMAGE_MODELS } from "@/lib/landing";
 import { safeUrl, str, strOrNull } from "@/lib/utils";
 
-const clampInt = (raw: string, min: number, max: number, fallback: number) => {
-  const n = parseInt(raw, 10);
-  return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fallback;
+const clampNum = (raw: string, min: number, max: number, fallback: number) => {
+  const n = parseFloat(raw.replace(",", "."));
+  return Number.isFinite(n) ? Math.round(Math.min(max, Math.max(min, n)) * 100) / 100 : fallback;
 };
 
 export async function updateSettings(formData: FormData) {
@@ -23,8 +24,10 @@ export async function updateSettings(formData: FormData) {
       welcome_message: strOrNull(formData, "welcome_message"),
       allow_signup: formData.get("allow_signup") === "on",
       auto_approve: formData.get("auto_approve") === "on",
-      landing_limit_kit: clampInt(str(formData, "landing_limit_kit"), 0, 100, 2),
-      landing_limit_member: clampInt(str(formData, "landing_limit_member"), 0, 200, 10),
+      landing_budget_pct: clampNum(str(formData, "landing_budget_pct"), 0, 100, 3),
+      landing_image_model: IMAGE_MODELS.some((m) => m.id === str(formData, "landing_image_model")) ? str(formData, "landing_image_model") : IMAGE_MODELS[0].id,
+      landing_default_usd_kit: clampNum(str(formData, "landing_default_usd_kit"), 0, 100000, 14),
+      landing_default_usd_member: clampNum(str(formData, "landing_default_usd_member"), 0, 100000, 14),
     })
     .eq("id", 1);
   if (error) throw error;

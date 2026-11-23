@@ -10,6 +10,8 @@ const GEMINI = "https://generativelanguage.googleapis.com";
 const key = () => (Deno.env.get("GEMINI_API_KEY") ?? Deno.env.get("GEMINI_KEY") ?? Deno.env.get("GOOGLE_API_KEY") ?? "").trim();
 const TEXT_MODELS = [Deno.env.get("GEMINI_MODEL"), "gemini-flash-latest", "gemini-2.5-flash", "gemini-flash-lite-latest", "gemini-2.5-flash-lite"].filter(Boolean) as string[];
 const IMAGE_MODELS = [Deno.env.get("GEMINI_IMAGE_MODEL"), "gemini-3.1-flash-image-preview", "gemini-2.5-flash-image"].filter(Boolean) as string[];
+// Costo aproximado de una landing (5 fotos + texto) en USD, según el modelo de imágenes.
+const LANDING_COST: Record<string, number> = { "gemini-3.1-flash-image-preview": 0.4, "gemini-2.5-flash-image": 0.2 };
 const BUCKET = "makedrop";
 const SLOTS = ["principal", "beneficios", "uso_1", "producto", "uso_2"] as const;
 type Slot = (typeof SLOTS)[number];
@@ -213,9 +215,9 @@ class ImageError extends Error {
   }
 }
 
-async function generateImage(prompt: string, refs: Part[]) {
+async function generateImage(prompt: string, refs: Part[], models: string[]) {
   let lastError = "";
-  for (const model of IMAGE_MODELS) {
+  for (const model of models) {
     for (let attempt = 0; attempt < 2; attempt++) {
       const body = (withConfig: boolean) => ({
         contents: [{ role: "user", parts: [...refs, { text: prompt }] }],
@@ -343,6 +345,10 @@ async function phaseImages(id: string) {
   delete result._stage;
   try {
     const refs = (await loadPhotos(row)).slice(0, 2);
+    // El modelo elegido en Ajustes va primero; el otro queda de respaldo.
+    const { data: cfg } = await admin.from("settings").select("landing_image_model").eq("id", 1).maybeSingle();
+    const preferred = cfg?.landing_image_model as string | undefined;
+    const models = preferred ? [preferred, ...IMAGE_MODELS.filter((m) => m !== preferred)] : IMAGE_MODELS;
     const images: Record<string, string> = {};
     const errors: string[] = [];
     let billing = false;
@@ -350,7 +356,7 @@ async function phaseImages(id: string) {
     await Promise.all(
       SLOTS.map(async (slot) => {
         try {
-          const img = await generateImage(imagePrompt(slot, result, refs.length > 0), refs);
+          const img = await generateImage(imagePrompt(slot, result, refs.length > 0), refs, models);
           imageModel = img.model;
           const ext = img.mime.includes("jpeg") ? "jpg" : img.mime.includes("webp") ? "webp" : "png";
           const path = `${row.user_id}/${row.id}/base-${slot}.${ext}`;
@@ -424,9 +430,16 @@ Deno.serve(async (req) => {
     return json({ error: "Acceso vencido" }, 403);
   }
   if (profile.role !== "admin" && profile.role !== "coach") {
-    // Límite por tipo de alumno (Ajustes): academia = rol kit, mentoría 1 a 1 = rol member.
-    const { data: settings } = await admin.from("settings").select("landing_limit_kit, landing_limit_member").eq("id", 1).maybeSingle();
-    const limit = profile.role === "kit" ? settings?.landing_limit_kit ?? 2 : settings?.landing_limit_member ?? 10;
+    // Presupuesto: el % (Ajustes, por defecto 3 %) de lo que paga el alumno al mes, dividido por el costo de cada landing.
+    const { data: settings } = await admin
+      .from("settings")
+      .select("landing_budget_pct, landing_image_model, landing_default_usd_kit, landing_default_usd_member")
+      .eq("id", 1)
+      .maybeSingle();
+    const { data: billing } = await admin.from("member_billing").select("monthly_usd").eq("user_id", user.id).maybeSingle();
+    const usd = Number(billing?.monthly_usd ?? (profile.role === "kit" ? settings?.landing_default_usd_kit : settings?.landing_default_usd_member) ?? 14);
+    const cost = LANDING_COST[settings?.landing_image_model ?? ""] ?? 0.4;
+    const limit = Math.floor((usd * Number(settings?.landing_budget_pct ?? 3)) / 100 / cost + 1e-9);
     const since = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
     const { count } = await admin.from("ai_landings").select("id", { count: "exact", head: true }).eq("user_id", user.id).gte("created_at", since);
     if ((count ?? 0) > limit) {

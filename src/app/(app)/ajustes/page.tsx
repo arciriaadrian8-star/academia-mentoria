@@ -6,6 +6,7 @@ import { FormMessage } from "@/components/FormMessage";
 import { ImageUpload } from "@/components/ImageUpload";
 import { PageHeader } from "@/components/PageHeader";
 import { SubmitButton } from "@/components/SubmitButton";
+import { IMAGE_MODELS, landingAllowance } from "@/lib/landing";
 import { updateSettings } from "./actions";
 
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ guardado?: string }> }) {
@@ -81,19 +82,42 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         <fieldset className="space-y-3 rounded-xl border border-zinc-200 p-4">
           <legend className="px-1 text-sm font-semibold">MakeDrop Landing (IA)</legend>
           <p className="text-xs text-zinc-500">
-            Cuántas landings puede crear cada alumno cada 30 días. Cada landing con fotos de IA cuesta unos 0,30 USD de tus créditos de Gemini. Tú y los coaches no tienen límite.
+            Cada alumno puede gastar en landings un porcentaje de lo que paga al mes. Pon cuánto paga cada uno en su ficha de Miembros; si no lo pones, se usa el pago por defecto. Tú y los coaches no tienen límite.
           </p>
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <label className="label" htmlFor="landing_limit_kit">Academia MakeDrop IA</label>
-              <input id="landing_limit_kit" name="landing_limit_kit" type="number" min={0} max={100} defaultValue={settings.landing_limit_kit} className="input" />
-              <p className="hint">Alumnos con membresía (rol «Solo Kit»).</p>
+              <label className="label" htmlFor="landing_budget_pct">% del pago mensual para IA</label>
+              <input id="landing_budget_pct" name="landing_budget_pct" type="number" min={0} max={100} step="0.5" defaultValue={settings.landing_budget_pct} className="input" />
             </div>
             <div>
-              <label className="label" htmlFor="landing_limit_member">Mentoría 1 a 1</label>
-              <input id="landing_limit_member" name="landing_limit_member" type="number" min={0} max={200} defaultValue={settings.landing_limit_member} className="input" />
-              <p className="hint">Miembros con acceso completo (rol «Miembro»).</p>
+              <label className="label" htmlFor="landing_image_model">Modelo de imágenes</label>
+              <select id="landing_image_model" name="landing_image_model" defaultValue={settings.landing_image_model} className="input">
+                {IMAGE_MODELS.map((m) => (
+                  <option key={m.id} value={m.id}>{m.label} (~{m.costUsd.toFixed(2)} USD por landing)</option>
+                ))}
+              </select>
             </div>
+            <div>
+              <label className="label" htmlFor="landing_default_usd_kit">Pago por defecto · Academia (USD/mes)</label>
+              <input id="landing_default_usd_kit" name="landing_default_usd_kit" type="number" min={0} step="0.01" defaultValue={settings.landing_default_usd_kit} className="input" />
+            </div>
+            <div>
+              <label className="label" htmlFor="landing_default_usd_member">Pago por defecto · Mentoría 1 a 1 (USD/mes)</label>
+              <input id="landing_default_usd_member" name="landing_default_usd_member" type="number" min={0} step="0.01" defaultValue={settings.landing_default_usd_member} className="input" />
+            </div>
+          </div>
+          <div className="rounded-lg bg-zinc-50 p-3 text-xs text-zinc-600">
+            <p className="font-semibold text-zinc-800">Con la configuración guardada:</p>
+            <ul className="mt-1 space-y-0.5">
+              {[12, 14, 19, 100, 500].map((usd) => {
+                const a = landingAllowance("kit", usd, settings);
+                return (
+                  <li key={usd}>
+                    Paga {usd} USD → presupuesto {a.budget?.toFixed(2)} USD → <strong>{a.limit} landing{a.limit === 1 ? "" : "s"}</strong> cada 30 días
+                  </li>
+                );
+              })}
+            </ul>
           </div>
         </fieldset>
 

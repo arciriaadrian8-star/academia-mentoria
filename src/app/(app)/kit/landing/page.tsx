@@ -1,14 +1,15 @@
 import Link from "next/link";
 import { ArrowLeft, CheckCircle2, Clock, XCircle } from "lucide-react";
 import { getSettings, requireKit } from "@/lib/auth";
-import { LANDING_TOOL_NAME, landingLimit } from "@/lib/landing";
+import { LANDING_TOOL_NAME, landingAllowance } from "@/lib/landing";
 import { timeAgo } from "@/lib/utils";
 import { EmptyState, PageHeader } from "@/components/PageHeader";
 import { LandingForm } from "./LandingForm";
 
 export default async function LandingToolPage() {
   const { supabase, user, profile } = await requireKit();
-  const limit = landingLimit(profile.role, await getSettings());
+  const { data: billing } = await supabase.from("member_billing").select("monthly_usd").eq("user_id", user.id).maybeSingle();
+  const { limit } = landingAllowance(profile.role, billing?.monthly_usd, await getSettings());
   const since = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
   const [{ data }, { count }] = await Promise.all([
     supabase.from("ai_landings").select("id, product, status, created_at, result->>titulo").eq("user_id", user.id).order("created_at", { ascending: false }).limit(30),

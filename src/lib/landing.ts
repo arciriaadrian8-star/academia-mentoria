@@ -60,15 +60,29 @@ const h1 = (emoji: string, titulo: string) => `<h1 ${C}>${esc(emoji)} <strong>${
 const p = (text: string) => `<p ${C}>${esc(text)}</p>`;
 const stars = (n: number) => {
   const v = Math.max(1, Math.min(5, Math.round(n || 5)));
-  return `<span style="color: #f5a623; font-size: 18px; letter-spacing: 2px;">${"★".repeat(v)}</span><span style="color: #d4d4d8; font-size: 18px; letter-spacing: 2px;">${"★".repeat(5 - v)}</span>`;
+  return `<span style="color: #f5a623; font-size: 20px; letter-spacing: 2px;">${"★".repeat(v)}${"☆".repeat(5 - v)}</span>`;
 };
 
+/** Colores sugeridos para la página (cada alumno elige el suyo). */
+export const BRAND_COLORS = ["#F26B1D", "#E11D48", "#7C3AED", "#2563EB", "#0891B2", "#059669", "#CA8A04", "#18181B"] as const;
+export const DEFAULT_COLOR = BRAND_COLORS[0];
+export const isHexColor = (v: string | null | undefined): v is string => Boolean(v && /^#[0-9a-fA-F]{6}$/.test(v));
+
+/** Si el color es muy claro para leerse sobre blanco, usa casi negro. */
+function readable(hex: string) {
+  const n = parseInt(hex.slice(1), 16);
+  const lum = (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
+  return lum > 0.72 ? "#18181b" : hex;
+}
+
 /**
- * Descripción completa del producto (estructura definitiva + reseñas + preguntas frecuentes).
- * `src(n)` devuelve la URL de cada imagen: en Shopify es la ruta del archivo importado; en la vista previa, la imagen local.
+ * Descripción completa del producto con el formato ganador: 6 bloques + reseñas + preguntas frecuentes al final.
+ * Todo centrado y sencillo, como la landing de referencia. `src(n)` devuelve la URL de cada imagen
+ * (en Shopify, la ruta del archivo importado; en la vista previa, la imagen local).
  */
-export function buildDescriptionHtml(r: LandingResult, src: (n: number | "gif") => string, opts: { hasGif: boolean }) {
+export function buildDescriptionHtml(r: LandingResult, src: (n: number | "gif") => string, opts: { hasGif: boolean; color?: string | null }) {
   const b = r.bloques;
+  const accent = readable(isHexColor(opts.color) ? opts.color : DEFAULT_COLOR);
   const out: string[] = [];
   out.push(h1(b.dolor.emoji, b.dolor.titulo), p(b.dolor.texto), img(src(opts.hasGif ? "gif" : 3), r.nombre_marca));
   out.push(h1(b.promesa.emoji, b.promesa.titulo), p(b.promesa.texto), img(src(4), r.nombre_marca));
@@ -79,32 +93,19 @@ export function buildDescriptionHtml(r: LandingResult, src: (n: number | "gif") 
   out.push(h1(b.uso.emoji, b.uso.titulo));
   b.uso.pasos.slice(0, 3).forEach((paso, i) => out.push(p(`${["1️⃣", "2️⃣", "3️⃣"][i]} ${paso}`)));
   out.push(img(src(opts.hasGif ? 3 : 1), r.nombre_marca));
-  out.push(h1(b.cierre.emoji, b.cierre.titulo), p(b.cierre.texto), `<p ${C}><strong>${esc(b.cierre.llamado)}</strong></p>`, img(src(6), "Compra verificada"));
+  out.push(h1(b.cierre.emoji, b.cierre.titulo), p(b.cierre.texto), `<p ${C}><strong style="color: ${accent};">${esc(b.cierre.llamado)}</strong></p>`, img(src(6), "Compra verificada"));
 
-  // Reseñas (obligatorias)
-  out.push(`<h2 ${C}><strong>${esc(r.resenas.titulo)}</strong></h2>`);
-  for (const rv of r.resenas.items.slice(0, 6)) {
-    out.push(
-      `<div style="max-width: 600px; margin: 12px auto; padding: 16px; border: 1px solid #e4e4e7; border-radius: 12px; text-align: left; background: #ffffff;">` +
-        `<p style="margin: 0;">${stars(rv.estrellas)}</p>` +
-        (rv.titulo ? `<p style="margin: 6px 0 0;"><strong>${esc(rv.titulo)}</strong></p>` : "") +
-        `<p style="margin: 6px 0 0;">${esc(rv.texto)}</p>` +
-        `<p style="margin: 8px 0 0; font-size: 14px; color: #71717a;"><strong>${esc(rv.nombre)}</strong> · ${esc(rv.ciudad)}</p>` +
-        `</div>`,
-    );
+  // Reseñas (obligatorias): 3, sencillas y centradas
+  out.push(`<h1 ${C}><strong>${esc(r.resenas.titulo)}</strong></h1>`);
+  for (const rv of r.resenas.items.slice(0, 3)) {
+    out.push(`<p ${C}>${stars(rv.estrellas)}<br>“${esc(rv.texto)}”<br><strong style="color: ${accent};">${esc(rv.nombre)}</strong> · ${esc(rv.ciudad)}</p>`);
   }
   if (!r.resenas_reales) out.push(`<p style="text-align: center; font-size: 12px; color: #a1a1aa;">Reseñas ilustrativas.</p>`);
 
-  // Preguntas frecuentes (siempre al final)
-  out.push(`<h2 ${C}><strong>${esc(r.faq.titulo)}</strong></h2>`);
-  for (const q of r.faq.items.slice(0, 8)) {
-    out.push(
-      `<div style="max-width: 600px; margin: 10px auto; padding: 14px 16px; border-radius: 12px; background: #f4f4f5; text-align: left;">` +
-        `<p style="margin: 0;"><strong>${esc(q.pregunta)}</strong></p>` +
-        `<p style="margin: 6px 0 0;">${esc(q.respuesta)}</p>` +
-        `</div>`,
-    );
-  }
+  // Preguntas frecuentes (al final y cortas): 2 del producto + 2 de compra
+  const faq = r.faq.items.length > 4 ? [...r.faq.items.slice(0, 2), ...r.faq.items.slice(-2)] : r.faq.items;
+  out.push(`<h1 ${C}><strong>${esc(r.faq.titulo)}</strong></h1>`);
+  for (const q of faq) out.push(`<p ${C}><strong style="color: ${accent};">${esc(q.pregunta)}</strong><br>${esc(q.respuesta)}</p>`);
   return out.join("\n");
 }
 
@@ -180,5 +181,5 @@ export function buildShopifyCsv(opts: {
     }
   });
   // BOM para que Excel y Shopify lean bien las tildes y los emojis.
-  return "﻿" + [header, ...rows].map((row) => row.map(csvCell).join(",")).join("\r\n") + "\r\n";
+  return "\uFEFF" + [header, ...rows].map((row) => row.map(csvCell).join(",")).join("\r\n") + "\r\n";
 }

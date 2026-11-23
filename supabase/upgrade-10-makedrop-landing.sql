@@ -17,6 +17,7 @@ create table if not exists public.ai_landings (
   offer         text check (char_length(offer) <= 200),
   audience      text check (char_length(audience) <= 40),
   store_name    text check (char_length(store_name) <= 60),
+  color         text check (color ~ '^#[0-9a-fA-F]{6}$'),
   reviews       text check (char_length(reviews) <= 4000),
   photo_paths   text[] not null default '{}' check (cardinality(photo_paths) <= 3),
   gif_path      text check (char_length(gif_path) <= 300),

@@ -9,9 +9,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { zipSync } from "fflate";
 import { AlertTriangle, Download, FileSpreadsheet, Loader2, Palette, Store } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { buildDescriptionHtml, buildShopifyCsv, FINAL_IMAGES, fileName, LANDING_BUCKET, type LandingResult } from "@/lib/landing";
+import { buildDescriptionHtml, buildShopifyCsv, DEFAULT_COLOR, FINAL_IMAGES, fileName, isHexColor, LANDING_BUCKET, type LandingResult } from "@/lib/landing";
 import { CopyButton } from "@/components/CopyButton";
-import { composeImage, composeTrust, loadBitmap, type Brand, type Fonts } from "./compose";
+import { composeImage, composeTrust, inkFor, loadBitmap, type Brand, type Fonts } from "./compose";
 
 type AiSlot = "principal" | "beneficios" | "uso_1" | "producto" | "uso_2";
 
@@ -24,6 +24,7 @@ export type StudioProps = {
   comparePrice: string | null;
   offer: string | null;
   storeName: string | null;
+  color: string | null;
   aiUrls: Partial<Record<AiSlot, string>>;
   photoUrls: string[];
   gifUrl: string | null;
@@ -48,7 +49,7 @@ h1{font-size:22px;line-height:1.25;margin:28px 0 10px}h2{font-size:21px;margin:3
 export function LandingStudio(props: StudioProps) {
   const { result: r, code } = props;
   const [brand, setBrand] = useState<Brand>(() => ({
-    color: "#F26B1D",
+    color: isHexColor(props.color) ? props.color : DEFAULT_COLOR,
     storeName: props.storeName || "Mi Tienda",
     freeShipping: !props.offer || /gratis/i.test(props.offer),
     cod: true,
@@ -109,10 +110,13 @@ export function LandingStudio(props: StudioProps) {
   }, [brand, props.aiUrls, props.photoUrls, r.recuadro, r.beneficios_imagen]);
 
   const hasGif = Boolean(props.gifUrl);
-  const shopifyHtml = useMemo(() => buildDescriptionHtml(r, (n) => `/cdn/shop/files/${fileName(code, n)}`, { hasGif }), [r, code, hasGif]);
+  const shopifyHtml = useMemo(
+    () => buildDescriptionHtml(r, (n) => `/cdn/shop/files/${fileName(code, n)}`, { hasGif, color: brand.color }),
+    [r, code, hasGif, brand.color],
+  );
   const previewHtml = useMemo(
-    () => buildDescriptionHtml(r, (n) => (n === "gif" ? props.gifUrl ?? "" : finals[n]?.url ?? ""), { hasGif }),
-    [r, finals, hasGif, props.gifUrl],
+    () => buildDescriptionHtml(r, (n) => (n === "gif" ? props.gifUrl ?? "" : finals[n]?.url ?? ""), { hasGif, color: brand.color }),
+    [r, finals, hasGif, props.gifUrl, brand.color],
   );
   const ready = Object.keys(finals).length === FINAL_IMAGES.length && !composing;
 
@@ -189,7 +193,9 @@ export function LandingStudio(props: StudioProps) {
     <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
       {/* Vista previa tipo página de producto */}
       <div className="card overflow-hidden">
-        <div className="bg-zinc-900 px-4 py-2 text-center text-xs font-bold text-white sm:text-sm">{r.barra_anuncio}</div>
+        <div className="px-4 py-2 text-center text-xs font-bold sm:text-sm" style={{ background: brand.color, color: inkFor(brand.color) }}>
+          {r.barra_anuncio}
+        </div>
         <div className="grid gap-5 p-4 sm:grid-cols-2 sm:p-6">
           <div>
             <div className="aspect-square overflow-hidden rounded-xl bg-zinc-100">
@@ -274,7 +280,7 @@ export function LandingStudio(props: StudioProps) {
           </div>
           <div className="flex items-center gap-3">
             <input type="color" aria-label="Color de los sellos" value={brand.color} onChange={(e) => setBrand({ ...brand, color: e.target.value })} className="h-10 w-14 cursor-pointer rounded-lg border border-zinc-200" />
-            <span className="text-sm text-zinc-600">Color de sellos y franjas</span>
+            <span className="text-sm text-zinc-600">Color de tu página (sellos, franjas y detalles)</span>
           </div>
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={brand.freeShipping} onChange={(e) => setBrand({ ...brand, freeShipping: e.target.checked })} /> Envío gratis

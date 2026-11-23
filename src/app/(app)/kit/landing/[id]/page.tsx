@@ -76,6 +76,7 @@ export default async function LandingResultPage({ params }: { params: Promise<{ 
     comparePrice: row.compare_price,
     offer: row.offer,
     storeName: row.store_name,
+    color: row.color ?? null,
     aiUrls: Object.fromEntries(Object.entries(images).map(([slot, path]) => [slot, urlOf(path)]).filter(([, u]) => u)),
     photoUrls: photoPaths.map(urlOf).filter(Boolean),
     gifUrl: row.gif_path ? urlOf(row.gif_path) || null : null,

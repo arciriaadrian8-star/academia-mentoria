@@ -4,22 +4,23 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireKit } from "@/lib/auth";
 import { COUNTRIES } from "@/lib/kit";
-import { AUDIENCES, LANDING_BUCKET, LANDING_MONTHLY_LIMIT } from "@/lib/landing";
+import { AUDIENCES, isHexColor, LANDING_BUCKET, LANDING_MONTHLY_LIMIT } from "@/lib/landing";
 import { str, strOrNull } from "@/lib/utils";
 
 export type LandingState = { error?: string } | null;
 
 export async function createLanding(_prev: LandingState, formData: FormData): Promise<LandingState> {
   const { supabase, user, isStaff } = await requireKit();
-  const product = str(formData, "product");
   const description = str(formData, "description");
+  // El nombre es opcional: si no lo escribe, usamos el comienzo de la descripción.
+  const product = str(formData, "product") || description.split(/[.,\n]/)[0].slice(0, 60).trim();
   const price = str(formData, "price");
   const photos = formData.getAll("photo_paths").map(String).filter((p) => p.startsWith(`${user.id}/`)).slice(0, 3);
   const gif = str(formData, "gif_path");
   const cleanup = () => supabase.storage.from(LANDING_BUCKET).remove([...photos, ...(gif ? [gif] : [])]);
 
-  if (product.length < 2) return { error: "Escribe el nombre del producto." };
   if (description.length < 10) return { error: "Describe el producto: qué es, qué problema resuelve y qué lo hace especial." };
+  if (product.length < 2) return { error: "Describe el producto un poco más." };
   if (!price) return { error: "Escribe el precio de venta." };
   if (photos.length === 0) return { error: "Sube al menos una foto del producto." };
 
@@ -47,6 +48,7 @@ export async function createLanding(_prev: LandingState, formData: FormData): Pr
       offer: strOrNull(formData, "offer")?.slice(0, 200) ?? null,
       audience,
       store_name: strOrNull(formData, "store_name")?.slice(0, 60) ?? null,
+      color: isHexColor(str(formData, "color")) ? str(formData, "color").toUpperCase() : null,
       reviews: strOrNull(formData, "reviews")?.slice(0, 4000) ?? null,
       photo_paths: photos,
       gif_path: gif.startsWith(`${user.id}/`) ? gif : null,

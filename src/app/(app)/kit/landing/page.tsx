@@ -22,7 +22,7 @@ export default async function LandingToolPage() {
       </Link>
       <PageHeader
         title={LANDING_TOOL_NAME}
-        description="Sube la foto de tu producto, tu oferta y una descripción. La IA te arma la landing completa para Shopify: título ganador, imágenes, descripción, reseñas y preguntas frecuentes, lista para importar."
+        description="Sube la foto de tu producto, tu oferta y una descripción. La IA te arma la landing completa para Shopify: título ganador, imágenes, descripción y preguntas frecuentes, lista para importar."
       />
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
         <LandingForm userId={user.id} used={isStaff ? null : count ?? 0} />

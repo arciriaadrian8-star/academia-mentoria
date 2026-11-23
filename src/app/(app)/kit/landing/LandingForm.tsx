@@ -273,11 +273,6 @@ export function LandingForm({ userId, used }: { userId: string; used: number | n
             <input id="store_name" name="store_name" maxLength={60} className="input" placeholder="Ej: NuxVerse Store" value={storeName} onChange={(e) => setStoreName(e.target.value)} />
           </div>
           <div>
-            <label className="label" htmlFor="reviews">Reseñas reales de tus clientes</label>
-            <textarea id="reviews" name="reviews" rows={3} maxLength={4000} className="input" placeholder={"Una por línea. Ej:\nMaría, Cali: Me llegó rápido y me encantó"} />
-            <p className="mt-1 text-xs text-zinc-500">Si no pegas ninguna, la IA escribe reseñas de ejemplo con el aviso «Reseñas ilustrativas».</p>
-          </div>
-          <div>
             <p className="label">GIF del producto en uso</p>
             <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-zinc-300 bg-zinc-50 px-3 py-2 text-sm text-zinc-600 hover:border-brand">
               <ImagePlus className="size-4 text-zinc-400" />

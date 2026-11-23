@@ -1,5 +1,5 @@
 // MakeDrop Landing: genera con Gemini el texto completo de una landing para Shopify
-// (estructura definitiva + reseñas + preguntas frecuentes) y las 5 fotos base con Nano Banana.
+// (estructura definitiva + preguntas frecuentes) y las 5 fotos base con Nano Banana.
 // POST { id } con el JWT del alumno. Responde 202 y sigue en segundo plano en 2 fases:
 //   "text"   → escribe todos los textos y las escenas de cada foto
 //   "images" → genera las 5 fotos tomando como referencia la foto del producto del alumno
@@ -52,21 +52,6 @@ const SCHEMA = {
       },
       required: ["dolor", "promesa", "formula", "habito", "uso", "cierre"],
     },
-    resenas: {
-      type: "object",
-      properties: {
-        titulo: str,
-        items: {
-          type: "array",
-          items: {
-            type: "object",
-            properties: { nombre: str, ciudad: str, estrellas: { type: "number" }, titulo: str, texto: str },
-            required: ["nombre", "ciudad", "estrellas", "texto"],
-          },
-        },
-      },
-      required: ["titulo", "items"],
-    },
     faq: {
       type: "object",
       properties: {
@@ -86,7 +71,7 @@ const SCHEMA = {
       required: ["principal", "beneficios", "uso_1", "producto", "uso_2"],
     },
   },
-  required: ["titulo", "nombre_marca", "barra_anuncio", "recuadro", "beneficios_imagen", "bloques", "resenas", "faq", "seo", "tipo_producto", "etiquetas", "producto_visual", "persona", "escenas"],
+  required: ["titulo", "nombre_marca", "barra_anuncio", "recuadro", "beneficios_imagen", "bloques", "faq", "seo", "tipo_producto", "etiquetas", "producto_visual", "persona", "escenas"],
 };
 
 type Row = Record<string, unknown> & {
@@ -107,7 +92,6 @@ type Row = Record<string, unknown> & {
 };
 
 function buildPrompt(r: Row, hasPhotos: boolean) {
-  const realReviews = (r.reviews ?? "").trim();
   return `Eres el mejor copywriter de e-commerce CONTRA ENTREGA de Latinoamérica (Shopify + anuncios en Meta y TikTok). Escribes landings que convierten clientes fríos en compradores: hablas como un amigo, no como un vendedor; muestras el cambio real en su cuerpo, su casa o su vida; y quitas todos los miedos a comprar.
 ${hasPhotos ? "Las imágenes adjuntas son fotos REALES del producto del alumno: míralas con atención para describirlo con exactitud." : "No hay foto del producto: imagínalo de forma realista a partir de la descripción."}
 
@@ -133,11 +117,9 @@ ESTRUCTURA OBLIGATORIA (la landing va en la descripción del producto de Shopify
    - habito: la transformación: cómo cambia su día, su cuerpo o su casa desde que lo usa.
    - uso: "Cómo usarlo para obtener mejores resultados" + EXACTAMENTE 3 pasos cortos.
    - cierre: "Nombre™ te acompaña donde vayas" o equivalente + texto que invita a comprar + "llamado" corto (ej: "¡Pídelo hoy y paga al recibir!").
-7. "resenas": título con emoji (ej: "⭐ Lo que dicen nuestros clientes ⭐") y EXACTAMENTE 5 reseñas.
-   ${realReviews ? `El alumno pegó reseñas REALES de sus clientes. Úsalas: corrige solo ortografía, no cambies el sentido, no inventes otras. Si son menos de 5, usa solo las que hay. Reseñas reales:\n"""${realReviews.slice(0, 3500)}"""` : `Escribe 5 reseñas DE EJEMPLO (la landing mostrará un aviso de que son ilustrativas): nombres latinos comunes con inicial del apellido (ej: "Marcela R."), ciudades de ${r.country}, 4 o 5 estrellas (al menos una de 4), y cada una cuenta UN momento concreto de su vida con el producto, en primera persona y con palabras de ${r.country} ("Me pasó que…"). Sin exagerar ni prometer curas.`}
-8. "faq": título con emoji (ej: "❓ Preguntas frecuentes ❓") y EXACTAMENTE 6 preguntas: 4 con las dudas reales del producto (cómo se usa, si sirve para mí, tallas/medidas, qué incluye, en cuánto tiempo noto el cambio…) y 2 de compra: cómo pago (contra entrega, al recibir) y cuánto tarda en llegar (envío a todo ${r.country}). Respuestas cortas y tranquilizadoras.
-9. "seo": título (máx 60 caracteres) y descripción (máx 155) para Google.
-10. "tipo_producto": categoría corta (ej: "Bienestar"). "etiquetas": 5 etiquetas.
+7. "faq": título con emoji (ej: "❓ Preguntas frecuentes ❓") y EXACTAMENTE 4 preguntas cortas: 2 con las dudas reales del producto (cómo se usa, si sirve para mí, tallas/medidas, qué incluye…) y 2 de compra: cómo pago (contra entrega, al recibir) y cuánto tarda en llegar (envío a todo ${r.country}). Respuestas cortas y tranquilizadoras.
+8. "seo": título (máx 60 caracteres) y descripción (máx 155) para Google.
+9. "tipo_producto": categoría corta (ej: "Bienestar"). "etiquetas": 5 etiquetas.
 
 PARA LAS FOTOS (en INGLÉS, las usa un generador de imágenes)
 - "producto_visual": descripción precisa del aspecto del producto (forma, colores, empaque, etiqueta, tamaño) para que salga idéntico.
@@ -247,6 +229,9 @@ async function generateImage(prompt: string, refs: Part[]) {
       }
       const data = await res.json().catch(() => ({}));
       const raw = JSON.stringify(data).slice(0, 400);
+      if (res.status === 402 || /prepayment credits are depleted/i.test(raw)) {
+        throw new ImageError("El saldo de prepago de Gemini está en cero. Recarga mínimo 5 USD en AI Studio para usar tus créditos.", true);
+      }
       if (res.status === 429 || res.status === 403 || res.status === 400) {
         if (/limit:\s*0|free.?tier|billing|FAILED_PRECONDITION|PERMISSION_DENIED/i.test(raw)) {
           throw new ImageError("Las imágenes con IA necesitan la facturación de Gemini activa (el plan gratis no genera imágenes).", true);
@@ -341,7 +326,7 @@ async function phaseText(id: string, selfUrl: string) {
     const { model, result } = await generateText([...photos, { text: buildPrompt(row, photos.length > 0) }]);
     await adminClient()
       .from("ai_landings")
-      .update({ result: { ...result, modelo: model, resenas_reales: Boolean(row.reviews?.trim()), _stage: "imagenes_pendiente" } })
+      .update({ result: { ...result, modelo: model, _stage: "imagenes_pendiente" } })
       .eq("id", id);
     await callSelf(selfUrl, id, "images");
   } catch (e) {
@@ -379,7 +364,7 @@ async function phaseImages(id: string) {
       }),
     );
     const aviso = billing
-      ? "Las fotos con IA necesitan la facturación de Gemini activa. Armamos la landing con tus fotos del producto."
+      ? "Las fotos con IA necesitan saldo en la cuenta de Gemini de la academia. Armamos la landing con tus fotos del producto."
       : errors.length
         ? `${errors.length} de 5 fotos no se pudieron generar; en su lugar usamos tu foto del producto.`
         : null;

@@ -27,7 +27,7 @@ const TOOLS: { href: string; title: string; text: string; icon: typeof Wand2; ta
     href: "/kit/landing",
     kitOnly: true,
     title: LANDING_TOOL_NAME,
-    text: "Sube la foto de tu producto y tu oferta: la IA te arma la landing completa para Shopify con imágenes, reseñas y preguntas frecuentes.",
+    text: "Sube la foto de tu producto y tu oferta: la IA te arma la landing completa para Shopify con imágenes, descripción ganadora y preguntas frecuentes.",
     icon: LayoutTemplate,
     tag: "IA en vivo",
   },

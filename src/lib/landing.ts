@@ -21,7 +21,7 @@ export type LandingResult = {
     uso: Block & { pasos: string[] };
     cierre: Block & { texto: string; llamado: string };
   };
-  resenas: { titulo: string; items: { nombre: string; ciudad: string; estrellas: number; titulo?: string; texto: string }[] };
+  resenas?: { titulo: string; items: { nombre: string; ciudad: string; estrellas: number; titulo?: string; texto: string }[] };
   faq: { titulo: string; items: { pregunta: string; respuesta: string }[] };
   seo: { titulo: string; descripcion: string };
   tipo_producto: string;
@@ -76,7 +76,7 @@ function readable(hex: string) {
 }
 
 /**
- * Descripción completa del producto con el formato ganador: 6 bloques + reseñas + preguntas frecuentes al final.
+ * Descripción completa del producto con el formato ganador: 6 bloques + preguntas frecuentes al final.
  * Todo centrado y sencillo, como la landing de referencia. `src(n)` devuelve la URL de cada imagen
  * (en Shopify, la ruta del archivo importado; en la vista previa, la imagen local).
  */
@@ -95,12 +95,7 @@ export function buildDescriptionHtml(r: LandingResult, src: (n: number | "gif") 
   out.push(img(src(opts.hasGif ? 3 : 1), r.nombre_marca));
   out.push(h1(b.cierre.emoji, b.cierre.titulo), p(b.cierre.texto), `<p ${C}><strong style="color: ${accent};">${esc(b.cierre.llamado)}</strong></p>`, img(src(6), "Compra verificada"));
 
-  // Reseñas (obligatorias): 3, sencillas y centradas
-  out.push(`<h1 ${C}><strong>${esc(r.resenas.titulo)}</strong></h1>`);
-  for (const rv of r.resenas.items.slice(0, 3)) {
-    out.push(`<p ${C}>${stars(rv.estrellas)}<br>“${esc(rv.texto)}”<br><strong style="color: ${accent};">${esc(rv.nombre)}</strong> · ${esc(rv.ciudad)}</p>`);
-  }
-  if (!r.resenas_reales) out.push(`<p style="text-align: center; font-size: 12px; color: #a1a1aa;">Reseñas ilustrativas.</p>`);
+  // Las reseñas no van aquí: los alumnos las ponen con su app de reseñas (Judge.me, Loox, etc.).
 
   // Preguntas frecuentes (al final y cortas): 2 del producto + 2 de compra
   const faq = r.faq.items.length > 4 ? [...r.faq.items.slice(0, 2), ...r.faq.items.slice(-2)] : r.faq.items;

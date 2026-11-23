@@ -7,7 +7,7 @@ import { Loader2 } from "lucide-react";
 const STEPS = [
   "La IA está mirando las fotos de tu producto…",
   "Escribiendo tu título ganador…",
-  "Escribiendo la descripción, las reseñas y las preguntas frecuentes…",
+  "Escribiendo la descripción y las preguntas frecuentes…",
   "Creando las fotos de tu producto con IA…",
   "Dando los últimos toques a tus imágenes…",
 ];

@@ -87,3 +87,15 @@ Las imágenes de la descripción reutilizan las de la galería (en el ejemplo: G
 - Nano Banana genera solo las fotos limpias (persona con producto, uso, producto premium, fondo para beneficios), usando la foto del alumno como referencia.
 - Los sellos, la franja, la lista de beneficios y la imagen de confianza se dibujan con código, así el texto sale siempre perfecto y con los colores de la tienda.
 - GIF: opcional, lo sube el alumno (video corto real del producto). Si no hay, va una imagen de uso.
+
+## 4. Cómo funciona el agente en la academia (Kit COD → MakeDrop Landing)
+
+**El alumno solo pone:** foto del producto (1 a 3), descripción, su oferta (precio hoy, precio antes, extras) y el color de su página (se sugiere el color de su producto). En «Más opciones»: país, cliente ideal, nombre de la tienda, reseñas reales y GIF.
+
+**La IA entrega en 1–2 minutos:**
+- Título con la fórmula, barra de anuncio, los 6 bloques de la descripción, 3 reseñas (reales o ilustrativas con aviso) y 4 preguntas frecuentes al final (2 del producto + 2 de compra), todo centrado como el ejemplo y con el color del alumno.
+- 6 imágenes cuadradas: 5 fotos (Nano Banana con la foto del alumno como referencia) + la de «Compra verificada». Sellos, franja y lista de beneficios se dibujan con código. Sin facturación de Gemini, se arman con las fotos del alumno.
+
+**Cómo llega a Shopify:** botón «Descargar archivo para Shopify» → Productos → Importar. Crea el producto en borrador con título, precios, imágenes y la landing completa. El alumno activa Releasit y lo publica. También hay ZIP con imágenes y textos, y botones para copiar.
+
+**Límites:** 4 landings cada 30 días por alumno; admin y coaches sin límite.

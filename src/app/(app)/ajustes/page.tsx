@@ -78,6 +78,25 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           )}
         </fieldset>
 
+        <fieldset className="space-y-3 rounded-xl border border-zinc-200 p-4">
+          <legend className="px-1 text-sm font-semibold">MakeDrop Landing (IA)</legend>
+          <p className="text-xs text-zinc-500">
+            Cuántas landings puede crear cada alumno cada 30 días. Cada landing con fotos de IA cuesta unos 0,30 USD de tus créditos de Gemini. Tú y los coaches no tienen límite.
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="label" htmlFor="landing_limit_kit">Academia MakeDrop IA</label>
+              <input id="landing_limit_kit" name="landing_limit_kit" type="number" min={0} max={100} defaultValue={settings.landing_limit_kit} className="input" />
+              <p className="hint">Alumnos con membresía (rol «Solo Kit»).</p>
+            </div>
+            <div>
+              <label className="label" htmlFor="landing_limit_member">Mentoría 1 a 1</label>
+              <input id="landing_limit_member" name="landing_limit_member" type="number" min={0} max={200} defaultValue={settings.landing_limit_member} className="input" />
+              <p className="hint">Miembros con acceso completo (rol «Miembro»).</p>
+            </div>
+          </div>
+        </fieldset>
+
         <div className="flex justify-end">
           <SubmitButton pendingText="Guardando...">Guardar ajustes</SubmitButton>
         </div>

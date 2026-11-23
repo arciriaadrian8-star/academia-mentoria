@@ -4,7 +4,7 @@ import { startTransition, useActionState, useEffect, useState } from "react";
 import { Check, ImagePlus, Loader2, Sparkles, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { COUNTRIES, loadLocal, saveLocal } from "@/lib/kit";
-import { AUDIENCES, BRAND_COLORS, DEFAULT_COLOR, descriptionPrompt, LANDING_BUCKET, LANDING_MONTHLY_LIMIT } from "@/lib/landing";
+import { AUDIENCES, BRAND_COLORS, DEFAULT_COLOR, descriptionPrompt, LANDING_BUCKET } from "@/lib/landing";
 import { CopyButton } from "@/components/CopyButton";
 import { FormMessage } from "@/components/FormMessage";
 import { createLanding, type LandingState } from "./actions";
@@ -60,7 +60,7 @@ async function suggestColor(file: File): Promise<string | null> {
   }
 }
 
-export function LandingForm({ userId, used }: { userId: string; used: number | null }) {
+export function LandingForm({ userId, used, limit }: { userId: string; used: number; limit: number | null }) {
   const [state, action, pending] = useActionState<LandingState, FormData>(createLanding, null);
   const [photos, setPhotos] = useState<{ file: File; preview: string }[]>([]);
   const [gif, setGif] = useState<File | null>(null);
@@ -135,7 +135,7 @@ export function LandingForm({ userId, used }: { userId: string; used: number | n
   }
 
   const busy = uploading || pending;
-  const left = used === null ? null : Math.max(LANDING_MONTHLY_LIMIT - used, 0);
+  const left = limit === null ? null : Math.max(limit - used, 0);
   const swatches = [...new Set([...(fromPhoto ? [fromPhoto] : []), ...BRAND_COLORS])];
 
   return (
@@ -289,7 +289,7 @@ export function LandingForm({ userId, used }: { userId: string; used: number | n
         {uploading ? "Subiendo fotos..." : pending ? "Enviando a la IA..." : "Crear mi landing"}
       </button>
       <p className="text-xs text-zinc-500">
-        Tarda entre 1 y 2 minutos.{left !== null && ` Te quedan ${left} de ${LANDING_MONTHLY_LIMIT} landings este mes.`}
+        Tarda entre 1 y 2 minutos.{limit !== null && ` Te quedan ${left} de ${limit} landings en estos 30 días.`}
       </p>
     </form>
   );

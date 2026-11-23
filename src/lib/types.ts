@@ -31,6 +31,9 @@ export interface Settings {
   welcome_message: string | null;
   allow_signup: boolean;
   auto_approve: boolean;
+  /** Landings con IA cada 30 días: academia (rol kit) y mentoría 1 a 1 (rol member). */
+  landing_limit_kit: number;
+  landing_limit_member: number;
 }
 
 export interface Course {

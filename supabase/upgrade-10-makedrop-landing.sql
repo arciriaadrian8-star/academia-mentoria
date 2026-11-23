@@ -48,6 +48,11 @@ revoke all on public.ai_landings from anon;
 grant select, insert, delete on public.ai_landings to authenticated;
 grant all on public.ai_landings to service_role;
 
+-- Límite de landings cada 30 días por tipo de alumno (el admin lo cambia en Ajustes)
+alter table public.settings
+  add column if not exists landing_limit_kit int not null default 2 check (landing_limit_kit between 0 and 100),
+  add column if not exists landing_limit_member int not null default 10 check (landing_limit_member between 0 and 200);
+
 -- Bucket privado: cada alumno solo ve y escribe en su carpeta (<user_id>/...)
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values ('makedrop', 'makedrop', false, 15728640, array['image/jpeg', 'image/png', 'image/webp', 'image/gif'])

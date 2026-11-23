@@ -10,7 +10,6 @@ const GEMINI = "https://generativelanguage.googleapis.com";
 const key = () => (Deno.env.get("GEMINI_API_KEY") ?? Deno.env.get("GEMINI_KEY") ?? Deno.env.get("GOOGLE_API_KEY") ?? "").trim();
 const TEXT_MODELS = [Deno.env.get("GEMINI_MODEL"), "gemini-flash-latest", "gemini-2.5-flash", "gemini-flash-lite-latest", "gemini-2.5-flash-lite"].filter(Boolean) as string[];
 const IMAGE_MODELS = [Deno.env.get("GEMINI_IMAGE_MODEL"), "gemini-3.1-flash-image-preview", "gemini-2.5-flash-image"].filter(Boolean) as string[];
-const MONTHLY_LIMIT = 4;
 const BUCKET = "makedrop";
 const SLOTS = ["principal", "beneficios", "uso_1", "producto", "uso_2"] as const;
 type Slot = (typeof SLOTS)[number];
@@ -125,7 +124,7 @@ PARA LAS FOTOS (en INGLÉS, las usa un generador de imágenes)
 - "producto_visual": descripción precisa del aspecto del producto (forma, colores, empaque, etiqueta, tamaño) para que salga idéntico.
 - "persona": el cliente ideal que aparece en las fotos (edad, género, rasgos latinos, ropa) — debe ser coherente en todas.
 - "escenas": una escena por foto, en inglés, 1-2 frases, sin texto en la imagen:
-   principal: the person smiling and holding the product toward the camera at chest height, simple warm studio background.
+   principal: the person smiling at the camera and holding the product close to their chest with both hands (arms bent, not extended), simple warm studio background.
    beneficios: the product alone on the RIGHT side, with elements related to its ingredients/features flying or arranged around it, on a deep colored background that matches the product colors; the LEFT 55% must be a clean empty area of that background color.
    uso_1: the person using/enjoying the product in a real everyday moment of their life (where the problem happens).
    producto: premium hero shot of the product alone on a dark elegant background with dramatic light.
@@ -140,7 +139,7 @@ Responde SOLO con el JSON del esquema.`;
 }
 
 const SLOT_SPEC: Record<Slot, string> = {
-  principal: "Front-facing portrait, person from the waist up, centered slightly to the left, product clearly visible in their hands.",
+  principal: "Medium shot from the waist up. The person is placed slightly to the LEFT and LOWER in the frame: the head must be below the top 35% of the image and away from the right side. The entire TOP-RIGHT quarter of the image must be plain, empty background (a text box will cover it). The product is held close to the chest, clearly visible, at its real size.",
   beneficios: "The product occupies the right 45% of the frame. The left 55% is an empty, clean area of the background color (no objects, no text).",
   uso_1: "Candid lifestyle photo, natural light, the product clearly visible and recognizable.",
   producto: "Product centered, large, filling about 60% of the frame, premium studio look.",
@@ -159,6 +158,7 @@ function imagePrompt(slot: Slot, result: Record<string, unknown>, hasPhotos: boo
     hasPhotos
       ? "CRITICAL: the product must look EXACTLY like the product in the attached reference photo(s): same shape, colors, packaging, label design and proportions. Do not redesign it."
       : "",
+    "REAL SCALE: keep the product at its true real-world size relative to hands, faces and objects (for example, a supplement bottle fits in one hand). Never enlarge it or bring it close to the lens.",
     "Keep the top-left corner, the top-right corner and the bottom 20% of the frame visually simple, without faces or the product, because graphics will be placed there later.",
     "Do NOT add any text, letters, numbers, logos, watermarks, stickers, price tags, badges or graphic overlays. Professional lighting, sharp focus, vibrant but natural colors.",
   ]
@@ -424,10 +424,13 @@ Deno.serve(async (req) => {
     return json({ error: "Acceso vencido" }, 403);
   }
   if (profile.role !== "admin" && profile.role !== "coach") {
+    // Límite por tipo de alumno (Ajustes): academia = rol kit, mentoría 1 a 1 = rol member.
+    const { data: settings } = await admin.from("settings").select("landing_limit_kit, landing_limit_member").eq("id", 1).maybeSingle();
+    const limit = profile.role === "kit" ? settings?.landing_limit_kit ?? 2 : settings?.landing_limit_member ?? 10;
     const since = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
     const { count } = await admin.from("ai_landings").select("id", { count: "exact", head: true }).eq("user_id", user.id).gte("created_at", since);
-    if ((count ?? 0) > MONTHLY_LIMIT) {
-      await admin.from("ai_landings").update({ status: "error", error: `Llegaste al límite de ${MONTHLY_LIMIT} landings en 30 días.` }).eq("id", id);
+    if ((count ?? 0) > limit) {
+      await admin.from("ai_landings").update({ status: "error", error: `Llegaste al límite de ${limit} landings en 30 días.` }).eq("id", id);
       return json({ error: "Límite mensual" }, 429);
     }
   }

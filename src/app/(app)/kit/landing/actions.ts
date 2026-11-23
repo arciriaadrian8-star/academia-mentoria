@@ -2,15 +2,15 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireKit } from "@/lib/auth";
+import { getSettings, requireKit } from "@/lib/auth";
 import { COUNTRIES } from "@/lib/kit";
-import { AUDIENCES, isHexColor, LANDING_BUCKET, LANDING_MONTHLY_LIMIT } from "@/lib/landing";
+import { AUDIENCES, isHexColor, LANDING_BUCKET, landingLimit } from "@/lib/landing";
 import { str, strOrNull } from "@/lib/utils";
 
 export type LandingState = { error?: string } | null;
 
 export async function createLanding(_prev: LandingState, formData: FormData): Promise<LandingState> {
-  const { supabase, user, isStaff } = await requireKit();
+  const { supabase, user, profile } = await requireKit();
   const description = str(formData, "description");
   // El nombre es opcional: si no lo escribe, usamos el comienzo de la descripción.
   const product = str(formData, "product") || description.split(/[.,\n]/)[0].slice(0, 60).trim();
@@ -24,12 +24,13 @@ export async function createLanding(_prev: LandingState, formData: FormData): Pr
   if (!price) return { error: "Escribe el precio de venta." };
   if (photos.length === 0) return { error: "Sube al menos una foto del producto." };
 
-  if (!isStaff) {
+  const limit = landingLimit(profile.role, await getSettings());
+  if (limit !== null) {
     const since = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
     const { count } = await supabase.from("ai_landings").select("id", { count: "exact", head: true }).eq("user_id", user.id).gte("created_at", since);
-    if ((count ?? 0) >= LANDING_MONTHLY_LIMIT) {
+    if ((count ?? 0) >= limit) {
       await cleanup();
-      return { error: `Llegaste al límite de ${LANDING_MONTHLY_LIMIT} landings en 30 días.` };
+      return { error: limit === 0 ? "Tu plan no incluye landings con IA." : `Llegaste al límite de ${limit} landings en 30 días.` };
     }
   }
 

@@ -1,7 +1,11 @@
 /** MakeDrop Landing: tipos, plantilla HTML de la descripción y archivo de importación para Shopify. */
 
 export const LANDING_TOOL_NAME = "MakeDrop Landing";
-export const LANDING_MONTHLY_LIMIT = 4;
+/** Landings cada 30 días según el tipo de alumno (null = sin límite: admin y coaches). */
+export function landingLimit(role: string, settings: { landing_limit_kit: number; landing_limit_member: number }) {
+  if (role === "admin" || role === "coach") return null;
+  return role === "kit" ? settings.landing_limit_kit : settings.landing_limit_member;
+}
 export const LANDING_BUCKET = "makedrop";
 
 export const AUDIENCES = ["Mujeres", "Hombres", "Mujeres y hombres", "Mamás y papás", "Niños", "Adultos mayores", "Mascotas y sus dueños"] as const;

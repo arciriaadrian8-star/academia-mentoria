@@ -65,6 +65,8 @@ const DEFAULT_SETTINGS: Settings = {
   welcome_message: null,
   allow_signup: true,
   auto_approve: false,
+  landing_limit_kit: 2,
+  landing_limit_member: 10,
 };
 
 export const getSettings = cache(async (): Promise<Settings> => {

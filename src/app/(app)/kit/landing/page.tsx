@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { ArrowLeft, CheckCircle2, Clock, XCircle } from "lucide-react";
-import { requireKit } from "@/lib/auth";
-import { LANDING_TOOL_NAME } from "@/lib/landing";
+import { getSettings, requireKit } from "@/lib/auth";
+import { LANDING_TOOL_NAME, landingLimit } from "@/lib/landing";
 import { timeAgo } from "@/lib/utils";
 import { EmptyState, PageHeader } from "@/components/PageHeader";
 import { LandingForm } from "./LandingForm";
 
 export default async function LandingToolPage() {
-  const { supabase, user, isStaff } = await requireKit();
+  const { supabase, user, profile } = await requireKit();
+  const limit = landingLimit(profile.role, await getSettings());
   const since = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
   const [{ data }, { count }] = await Promise.all([
     supabase.from("ai_landings").select("id, product, status, created_at, result->>titulo").eq("user_id", user.id).order("created_at", { ascending: false }).limit(30),
@@ -25,7 +26,7 @@ export default async function LandingToolPage() {
         description="Sube la foto de tu producto, tu oferta y una descripción. La IA te arma la landing completa para Shopify: título ganador, imágenes, descripción y preguntas frecuentes, lista para importar."
       />
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
-        <LandingForm userId={user.id} used={isStaff ? null : count ?? 0} />
+        <LandingForm userId={user.id} used={count ?? 0} limit={limit} />
         <div className="space-y-3">
           <h2 className="font-semibold">Mis landings</h2>
           {rows.length === 0 ? (

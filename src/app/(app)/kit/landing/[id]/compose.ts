@@ -1,6 +1,8 @@
 /**
- * Dibuja en el navegador las imágenes vendedoras de la landing (1080×1080), estilo «Pidelisto»:
- * franja superior con TITULAR grande · foto en el centro · franja inferior con el producto y el PRECIO.
+ * Dibuja en el navegador las imágenes vendedoras de la landing (1080×1080) mezclando lo mejor de 2 estilos:
+ * - «LullaBites»: foto a sangre con sello estrella «SÚPER PROMO», recuadro con el nombre y franja de envío;
+ *   infografía «BENEFICIOS:» y el producto premium con «MEGA OFERTA».
+ * - «Pidelisto»: franja superior con TITULAR grande · foto en el centro · franja inferior con el PRECIO.
  * Todo el texto lo pone el código (nunca sale con errores) sobre 3 fotos de IA + la foto del alumno.
  */
 import type { ImageTexts, Review } from "@/lib/landing";
@@ -24,10 +26,10 @@ export type Pics = {
   delivery: ImageBitmap | null;
 };
 
-export type Kind = "oferta" | "beneficios" | "antes_despues" | "que_llega" | "usos" | "comparacion" | "resenas" | "aspiracional" | "confianza" | "producto";
+export type Kind = "principal" | "oferta" | "beneficios" | "antes_despues" | "usos" | "que_llega" | "mega_oferta" | "comparacion" | "resenas" | "confianza";
 
 /** Lo que va escrito en «Beneficios» y «Reseñas». */
-export type Extra = { beneficios: string[]; reviews: Review[] };
+export type Extra = { beneficios: string[]; reviews: Review[]; recuadro: { linea1: string; linea2: string } };
 
 export async function loadBitmap(url: string) {
   const res = await fetch(url);
@@ -262,6 +264,173 @@ function caption(ctx: CanvasRenderingContext2D, text: string, x: number, w: numb
   lines.forEach((l, i) => ctx.fillText(l, x + w / 2, MID_BOTTOM - 26 - (lines.length - 1 - i) * size * 1.15));
 }
 
+/* ---------- Estilo LullaBites ---------- */
+
+/** Color de los sellos y franjas LullaBites: naranja original, o el color del alumno en «Mi color». */
+const lbColor = (brand: Brand) => (brand.look === "marca" ? brand.color : "#F26B1D");
+
+/** Sello estrella tipo «SÚPER PROMO». */
+function lbBadge(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number, lines: string[], color: string, fonts: Fonts) {
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(-0.14);
+  const points = 18;
+  ctx.beginPath();
+  for (let i = 0; i < points * 2; i++) {
+    const rad = i % 2 === 0 ? r : r * 0.86;
+    const a = (Math.PI * i) / points;
+    ctx.lineTo(Math.cos(a) * rad, Math.sin(a) * rad);
+  }
+  ctx.closePath();
+  ctx.shadowColor = "rgba(0,0,0,0.35)";
+  ctx.shadowBlur = 18;
+  ctx.fillStyle = color;
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.lineWidth = 7;
+  ctx.strokeStyle = "#ffffff";
+  ctx.stroke();
+  const ink = inkFor(color);
+  ctx.textAlign = "center";
+  const size = r * 0.48;
+  ctx.font = `italic 400 ${size}px ${fonts.display}`;
+  lines.forEach((l, i) => {
+    const y = (i - (lines.length - 1) / 2) * size * 0.98 + size * 0.36;
+    ctx.lineWidth = 8;
+    ctx.strokeStyle = shade(color, -0.45);
+    ctx.strokeText(l, 0, y);
+    ctx.fillStyle = ink;
+    ctx.fillText(l, 0, y);
+  });
+  ctx.restore();
+}
+
+/** Franja «🚚 ENVÍO GRATIS / 🏠 PAGO CONTRAENTREGA». */
+function lbStrip(ctx: CanvasRenderingContext2D, brand: Brand, fonts: Fonts, align: "left" | "right" = "left") {
+  const lines = [brand.freeShipping ? "🚚  ENVÍO GRATIS" : "", brand.cod ? "🏠  PAGO CONTRAENTREGA" : ""].filter(Boolean);
+  if (!lines.length) return;
+  const color = lbColor(brand);
+  ctx.save();
+  const size = 40;
+  ctx.font = `800 ${size}px ${fonts.body}`;
+  const w = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 64;
+  const h = lines.length * size * 1.25 + 40;
+  const x = align === "left" ? 40 : SIZE - 40 - w;
+  const y = SIZE - 40 - h;
+  ctx.shadowColor = "rgba(0,0,0,0.3)";
+  ctx.shadowBlur = 16;
+  roundRect(ctx, x, y, w, h, 14);
+  ctx.fillStyle = color;
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = "rgba(255,255,255,0.9)";
+  ctx.stroke();
+  ctx.fillStyle = inkFor(color);
+  ctx.textAlign = "left";
+  lines.forEach((l, i) => ctx.fillText(l, x + 32, y + 20 + size + i * size * 1.25 - 6));
+  ctx.restore();
+}
+
+/** Recuadro de la imagen principal: «Nombre™ Original:» + beneficio. */
+function lbTitleBox(ctx: CanvasRenderingContext2D, linea1: string, linea2: string, color: string, fonts: Fonts) {
+  ctx.save();
+  const maxW = 500;
+  ctx.font = `800 38px ${fonts.body}`;
+  const l1 = wrap(ctx, linea1, maxW - 48).slice(0, 2);
+  ctx.font = `600 27px ${fonts.body}`;
+  const l2 = wrap(ctx, linea2, maxW - 48).slice(0, 3);
+  const h = 32 + l1.length * 44 + l2.length * 33 + 20;
+  const x = SIZE - 40 - maxW;
+  const y = 40;
+  ctx.shadowColor = "rgba(0,0,0,0.3)";
+  ctx.shadowBlur = 16;
+  roundRect(ctx, x, y, maxW, h, 14);
+  ctx.fillStyle = color;
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = inkFor(color);
+  ctx.textAlign = "center";
+  let ty = y + 26 + 34;
+  ctx.font = `800 38px ${fonts.body}`;
+  for (const l of l1) {
+    ctx.fillText(l, x + maxW / 2, ty);
+    ty += 44;
+  }
+  ctx.font = `600 27px ${fonts.body}`;
+  for (const l of l2) {
+    ctx.fillText(l, x + maxW / 2, ty - 6);
+    ty += 33;
+  }
+  ctx.restore();
+}
+
+/** Infografía «BENEFICIOS:»: lista con ✓ sobre fondo oscuro y el producto en una tarjeta. */
+function lbBenefits(ctx: CanvasRenderingContext2D, items: string[], photo: ImageBitmap | null, color: string, fonts: Fonts) {
+  const g = ctx.createLinearGradient(0, 0, SIZE, SIZE);
+  g.addColorStop(0, shade(color, -0.78));
+  g.addColorStop(1, shade(color, -0.45));
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, SIZE, SIZE);
+  // Tarjeta con el producto
+  if (photo) {
+    ctx.save();
+    roundRect(ctx, 630, 250, 410, 560, 28);
+    const bg = photoBackground(photo);
+    ctx.shadowColor = "rgba(0,0,0,0.5)";
+    ctx.shadowBlur = 40;
+    ctx.fillStyle = bg.light ? bg.color : "#ffffff";
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.clip();
+    contain(ctx, photo, 650, 270, 370, 520);
+    ctx.restore();
+  }
+  const x = 40;
+  const w = 560;
+  const rowH = 118;
+  const top = 200;
+  ctx.save();
+  ctx.fillStyle = "#ffffff";
+  ctx.font = `400 92px ${fonts.display}`;
+  ctx.textAlign = "left";
+  ctx.shadowColor = "rgba(0,0,0,0.45)";
+  ctx.shadowBlur = 14;
+  ctx.fillText("BENEFICIOS:", x + 8, 150);
+  ctx.shadowBlur = 0;
+  const list = items.slice(0, 5);
+  roundRect(ctx, x, top, w, rowH * list.length + 30, 22);
+  ctx.fillStyle = "rgba(10, 16, 40, 0.62)";
+  ctx.fill();
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = "rgba(255,255,255,0.35)";
+  ctx.stroke();
+  list.forEach((text, i) => {
+    const cy = top + 15 + rowH * i + rowH / 2;
+    ctx.beginPath();
+    ctx.arc(x + 58, cy, 30, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.strokeStyle = inkFor(color);
+    ctx.lineWidth = 6;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(x + 44, cy + 1);
+    ctx.lineTo(x + 54, cy + 12);
+    ctx.lineTo(x + 74, cy - 10);
+    ctx.stroke();
+    ctx.fillStyle = "#ffffff";
+    ctx.font = `700 31px ${fonts.body}`;
+    const lines = wrap(ctx, text, w - 140).slice(0, 2);
+    lines.forEach((l, j) => ctx.fillText(l, x + 108, cy + 11 - (lines.length - 1) * 19 + j * 38));
+    if (i < list.length - 1) {
+      ctx.fillStyle = "rgba(255,255,255,0.18)";
+      ctx.fillRect(x + 24, top + 15 + rowH * (i + 1), w - 48, 2);
+    }
+  });
+  ctx.restore();
+}
+
 const toBlob = (c: HTMLCanvasElement) =>
   new Promise<Blob>((resolve, reject) => c.toBlob((b) => (b ? resolve(b) : reject(new Error("No se pudo crear la imagen"))), "image/jpeg", 0.9));
 
@@ -271,8 +440,51 @@ export async function composeImage(kind: Kind, t: ImageTexts, pics: Pics, prices
   const { c, ctx } = canvas();
   const p = palette(brand);
 
-  if (kind === "producto") {
-    productOnBackground(ctx, pics.photo, 0, 0, SIZE, SIZE, 60);
+  // --- Imágenes estilo LullaBites (sin franjas de titular/precio) ---
+  if (kind === "principal") {
+    const color = lbColor(brand);
+    sceneOrPhoto(ctx, pics.despues, pics.photo, 0, 0, SIZE, SIZE);
+    lbBadge(ctx, 175, 175, 135, ["SÚPER", "PROMO"], color, fonts);
+    lbTitleBox(ctx, extra.recuadro.linea1, extra.recuadro.linea2, color, fonts);
+    lbStrip(ctx, brand, fonts, "left");
+    return toBlob(c);
+  }
+  if (kind === "beneficios") {
+    const color = lbColor(brand);
+    lbBenefits(ctx, extra.beneficios, pics.photo, color, fonts);
+    lbBadge(ctx, SIZE - 175, 140, 120, ["SÚPER", "PROMO"], color, fonts);
+    lbStrip(ctx, brand, fonts, "right");
+    return toBlob(c);
+  }
+  if (kind === "mega_oferta") {
+    // Producto protagonista (foto del alumno) sobre fondo premium oscuro, como la «MEGA OFERTA» de LullaBites.
+    const color = lbColor(brand);
+    const g = ctx.createRadialGradient(SIZE / 2, SIZE / 2, 80, SIZE / 2, SIZE / 2, SIZE * 0.75);
+    g.addColorStop(0, "#3f3f46");
+    g.addColorStop(1, "#09090b");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, SIZE, SIZE);
+    if (pics.photo) {
+      const bg = photoBackground(pics.photo);
+      ctx.save();
+      if (bg.light) {
+        roundRect(ctx, 170, 170, 740, 740, 40);
+        ctx.shadowColor = "rgba(0,0,0,0.6)";
+        ctx.shadowBlur = 50;
+        ctx.fillStyle = bg.color;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.clip();
+        contain(ctx, pics.photo, 200, 200, 680, 680);
+      } else {
+        ctx.shadowColor = "rgba(0,0,0,0.6)";
+        ctx.shadowBlur = 50;
+        contain(ctx, pics.photo, 140, 140, 800, 760);
+      }
+      ctx.restore();
+    }
+    lbBadge(ctx, SIZE - 175, 175, 135, ["MEGA", "OFERTA"], color, fonts);
+    lbStrip(ctx, brand, fonts, "right");
     return toBlob(c);
   }
 
@@ -328,47 +540,6 @@ export async function composeImage(kind: Kind, t: ImageTexts, pics: Pics, prices
         ctx.fillRect(x - 4, y - 13, w + 8, 4);
       }
       header(ctx, t.titulares.oferta, fonts, p.header, p.headerInk);
-      break;
-    }
-    case "beneficios": {
-      // Infografía (estructura LullaBites) dentro del marco: lista con ✓ a la izquierda y el producto a la derecha.
-      const g = ctx.createLinearGradient(0, MID_TOP, SIZE, MID_BOTTOM);
-      g.addColorStop(0, "#111827");
-      g.addColorStop(1, "#1f2937");
-      ctx.fillStyle = g;
-      ctx.fillRect(0, MID_TOP, SIZE, MID_H);
-      const card = { x: 640, y: MID_TOP + 60, w: 400, h: MID_H - 120 };
-      roundRect(ctx, card.x, card.y, card.w, card.h, 26);
-      ctx.save();
-      ctx.shadowColor = "rgba(0,0,0,0.5)";
-      ctx.shadowBlur = 30;
-      ctx.fillStyle = pics.photo && photoBackground(pics.photo).light ? photoBackground(pics.photo).color : "#ffffff";
-      ctx.fill();
-      ctx.restore();
-      if (pics.photo) contain(ctx, pics.photo, card.x + 20, card.y + 20, card.w - 40, card.h - 40);
-      const items = extra.beneficios.slice(0, 5);
-      const rowH = (MID_H - 80) / Math.max(items.length, 1);
-      items.forEach((text, i) => {
-        const cy = MID_TOP + 40 + rowH * i + rowH / 2;
-        ctx.beginPath();
-        ctx.arc(80, cy, 30, 0, Math.PI * 2);
-        ctx.fillStyle = "#16A34A";
-        ctx.fill();
-        ctx.strokeStyle = "#ffffff";
-        ctx.lineWidth = 7;
-        ctx.lineCap = "round";
-        ctx.lineJoin = "round";
-        ctx.beginPath();
-        ctx.moveTo(66, cy + 1);
-        ctx.lineTo(77, cy + 12);
-        ctx.lineTo(96, cy - 11);
-        ctx.stroke();
-        const { lines, size } = fitLines(ctx, text, (s) => `700 ${s}px ${fonts.body}`, 480, 2, 34, 24);
-        ctx.fillStyle = "#ffffff";
-        ctx.textAlign = "left";
-        lines.forEach((l, j) => ctx.fillText(l, 130, cy + 12 - (lines.length - 1) * size * 0.58 + j * size * 1.16));
-      });
-      header(ctx, "Beneficios", fonts, p.header, p.headerInk);
       break;
     }
     case "resenas": {
@@ -488,21 +659,6 @@ export async function composeImage(kind: Kind, t: ImageTexts, pics: Pics, prices
       caption(ctx, t.comparacion.sin_texto, 0, half, fonts);
       caption(ctx, t.comparacion.con_texto, half, half, fonts);
       header(ctx, t.titulares.comparacion, fonts, p.header, p.headerInk);
-      break;
-    }
-    case "aspiracional": {
-      const sub = 70;
-      sceneOrPhoto(ctx, pics.despues, pics.photo, 0, MID_TOP + sub, SIZE, MID_H - sub);
-      ctx.fillStyle = p.tag;
-      ctx.fillRect(0, MID_TOP, SIZE, sub);
-      const { size } = fitLines(ctx, t.aspiracional_sub, (s) => `700 ${s}px ${fonts.body}`, SIZE - 80, 1, 36, 22);
-      ctx.fillStyle = p.tagInk;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.font = `700 ${size}px ${fonts.body}`;
-      ctx.fillText(t.aspiracional_sub, SIZE / 2, MID_TOP + sub / 2 + 2);
-      ctx.textBaseline = "alphabetic";
-      header(ctx, t.titulares.aspiracional, fonts, p.footer, p.footerInk);
       break;
     }
     case "confianza": {

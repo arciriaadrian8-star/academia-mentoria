@@ -38,7 +38,7 @@ export type StudioProps = {
 };
 
 const MAX_REDOS = 3;
-const REDO_SLOTS: Partial<Record<number, AiSlot>> = { 3: "antes", 5: "usos", 8: "despues" };
+const REDO_SLOTS: Partial<Record<number, AiSlot>> = { 1: "despues", 4: "antes", 5: "usos" };
 
 const FONTS: Fonts = { display: "Anton, Impact, sans-serif", body: "Montserrat, Arial, sans-serif" };
 
@@ -108,7 +108,7 @@ export function LandingStudio(props: StudioProps) {
         const texts = imageTexts(r);
         const prices = { price: props.price, compare: props.comparePrice, discountPct: discountPct(props.price, props.comparePrice) };
         const next: Record<number, { blob: Blob; url: string }> = {};
-        const extra = { beneficios: r.beneficios_imagen ?? [], reviews };
+        const extra = { beneficios: r.beneficios_imagen ?? [], reviews, recuadro: r.recuadro };
         for (const im of images) {
           const blob = await composeImage(im.kind, texts, pics, prices, brand, FONTS, extra);
           next[im.n] = { blob, url: URL.createObjectURL(blob) };
@@ -352,7 +352,7 @@ export function LandingStudio(props: StudioProps) {
             <span className="label">Estilo de las imágenes</span>
             <div className="grid grid-cols-2 gap-2">
               {([
-                { id: "ganador", label: "Amarillo y rojo", hint: "El ganador" },
+                { id: "ganador", label: "Colores ganadores", hint: "Amarillo, rojo y naranja" },
                 { id: "marca", label: "Mi color", hint: "Color de tu tienda" },
               ] as { id: Look; label: string; hint: string }[]).map((o) => (
                 <button

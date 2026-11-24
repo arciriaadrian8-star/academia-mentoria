@@ -67,21 +67,22 @@ export type LandingResult = {
 };
 
 /**
- * Las imágenes finales, en el orden de la galería de Shopify. Combina las estructuras ganadoras:
- * marco Pidelisto (titular arriba, precio abajo) + infografía de beneficios + antes/después + reseñas.
- * «Reseñas» solo sale si el alumno pegó reseñas reales de sus clientes.
+ * Las 10 imágenes finales, en el orden de la galería de Shopify. Mezcla lo mejor de las 2 landings ganadoras:
+ * LullaBites (L): foto emocional con sello «SÚPER PROMO», infografía «BENEFICIOS:», producto «MEGA OFERTA».
+ * Pidelisto (P): titular grande arriba y precio abajo: oferta, antes/después, usos, qué llega, comparación,
+ * reseñas (solo si el alumno pegó reseñas reales) y confianza.
  */
 export const FINAL_IMAGES = [
-  { n: 1, kind: "oferta", label: "Oferta" },
-  { n: 2, kind: "beneficios", label: "Beneficios" },
-  { n: 3, kind: "antes_despues", label: "Antes y después" },
-  { n: 4, kind: "que_llega", label: "Qué le llega" },
+  { n: 1, kind: "principal", label: "Principal" },
+  { n: 2, kind: "oferta", label: "Oferta" },
+  { n: 3, kind: "beneficios", label: "Beneficios" },
+  { n: 4, kind: "antes_despues", label: "Antes y después" },
   { n: 5, kind: "usos", label: "Usos" },
-  { n: 6, kind: "comparacion", label: "Comparación" },
-  { n: 7, kind: "resenas", label: "Reseñas" },
-  { n: 8, kind: "aspiracional", label: "Aspiracional" },
-  { n: 9, kind: "confianza", label: "Confianza" },
-  { n: 10, kind: "producto", label: "Producto" },
+  { n: 6, kind: "que_llega", label: "Qué le llega" },
+  { n: 7, kind: "mega_oferta", label: "Mega oferta" },
+  { n: 8, kind: "comparacion", label: "Comparación" },
+  { n: 9, kind: "resenas", label: "Reseñas" },
+  { n: 10, kind: "confianza", label: "Confianza" },
 ] as const;
 
 export type Review = { nombre: string; ciudad: string; texto: string };
@@ -184,19 +185,19 @@ export function buildDescriptionHtml(r: LandingResult, src: (n: number | "gif") 
   const b = r.bloques;
   const accent = readable(isHexColor(opts.color) ? opts.color : DEFAULT_COLOR);
   const out: string[] = [];
-  // Imágenes: 3 antes/después · 4 qué llega · 2 beneficios · 8 aspiracional · 6 comparación · 5 usos · 9 confianza · 7 reseñas
-  out.push(h1(b.dolor.emoji, b.dolor.titulo), p(b.dolor.texto), img(src(opts.hasGif ? "gif" : 3), r.nombre_marca));
-  if (opts.hasGif) out.push(img(src(3), `Antes y después con ${r.nombre_marca}`));
-  out.push(h1(b.promesa.emoji, b.promesa.titulo), p(b.promesa.texto), img(src(4), `Qué incluye ${r.nombre_marca}`));
+  // Imágenes: 4 antes/después · 1 principal · 6 qué llega · 3 beneficios · 8 comparación · 5 usos · 7 mega oferta · 10 confianza · 9 reseñas
+  out.push(h1(b.dolor.emoji, b.dolor.titulo), p(b.dolor.texto), img(src(opts.hasGif ? "gif" : 4), r.nombre_marca));
+  if (opts.hasGif) out.push(img(src(4), `Antes y después con ${r.nombre_marca}`));
+  out.push(h1(b.promesa.emoji, b.promesa.titulo), p(b.promesa.texto), img(src(1), r.nombre_marca), img(src(6), `Qué incluye ${r.nombre_marca}`));
   out.push(h1(b.formula.emoji, b.formula.titulo));
   for (const x of b.formula.beneficios.slice(0, 3)) out.push(`<p ${C}>➡️ <strong>${esc(x.nombre)}:</strong> ${esc(x.texto)}</p>`);
-  out.push(img(src(2), `Beneficios de ${r.nombre_marca}`));
-  out.push(h1(b.habito.emoji, b.habito.titulo), p(b.habito.texto), img(src(8), r.nombre_marca), img(src(6), `${r.nombre_marca} frente a la alternativa`));
+  out.push(img(src(3), `Beneficios de ${r.nombre_marca}`));
+  out.push(h1(b.habito.emoji, b.habito.titulo), p(b.habito.texto), img(src(8), `${r.nombre_marca} frente a la alternativa`));
   out.push(h1(b.uso.emoji, b.uso.titulo));
   b.uso.pasos.slice(0, 3).forEach((paso, i) => out.push(p(`${["1️⃣", "2️⃣", "3️⃣"][i]} ${paso}`)));
   out.push(img(src(5), `Usos de ${r.nombre_marca}`));
-  out.push(h1(b.cierre.emoji, b.cierre.titulo), p(b.cierre.texto), `<p ${C}><strong style="color: ${accent};">${esc(b.cierre.llamado)}</strong></p>`, img(src(9), "Paga al recibir"));
-  if (opts.hasReviews) out.push(img(src(7), "Lo que dicen nuestros clientes"));
+  out.push(h1(b.cierre.emoji, b.cierre.titulo), p(b.cierre.texto), `<p ${C}><strong style="color: ${accent};">${esc(b.cierre.llamado)}</strong></p>`, img(src(7), r.nombre_marca), img(src(10), "Paga al recibir"));
+  if (opts.hasReviews) out.push(img(src(9), "Lo que dicen nuestros clientes"));
 
   // Las reseñas no van aquí: los alumnos las ponen con su app de reseñas (Judge.me, Loox, etc.).
 

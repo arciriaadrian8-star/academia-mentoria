@@ -32,6 +32,9 @@ export interface Settings {
   allow_signup: boolean;
   auto_approve: boolean;
   /** MakeDrop Landing: % del pago mensual de cada alumno que puede gastar en IA, modelo de imágenes y pago por defecto. */
+  landing_limit_mode: "fijo" | "porcentaje";
+  landing_monthly_kit: number;
+  landing_monthly_member: number;
   landing_budget_pct: number;
   landing_image_model: string;
   landing_default_usd_kit: number;

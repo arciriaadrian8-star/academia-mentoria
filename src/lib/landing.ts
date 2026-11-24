@@ -1,14 +1,21 @@
 /** MakeDrop Landing: tipos, plantilla HTML de la descripción y archivo de importación para Shopify. */
 
 export const LANDING_TOOL_NAME = "MakeDrop Landing";
-/** Modelos de imágenes y su costo aproximado por landing (5 fotos + texto), en USD. */
+/**
+ * Modelo de las 2 fotos con personas y costo aproximado de cada landing (3 fotos con IA + texto).
+ * La foto del producto solo siempre usa el modelo económico.
+ */
 export const IMAGE_MODELS = [
-  { id: "gemini-3.1-flash-image-preview", label: "Nano Banana 2 · mejor calidad", costUsd: 0.4 },
-  { id: "gemini-2.5-flash-image", label: "Nano Banana · más económico", costUsd: 0.2 },
+  { id: "gemini-3.1-flash-image-preview", label: "Nano Banana 2 · mejor calidad", costUsd: 0.15, costCop: 575 },
+  { id: "gemini-2.5-flash-image", label: "Nano Banana · más económico", costUsd: 0.1, costCop: 400 },
 ] as const;
 export const landingCost = (model: string) => IMAGE_MODELS.find((m) => m.id === model)?.costUsd ?? IMAGE_MODELS[0].costUsd;
+export const landingCostCop = (model: string) => IMAGE_MODELS.find((m) => m.id === model)?.costCop ?? IMAGE_MODELS[0].costCop;
 
 type BudgetSettings = {
+  landing_limit_mode: string;
+  landing_monthly_kit: number;
+  landing_monthly_member: number;
   landing_budget_pct: number;
   landing_image_model: string;
   landing_default_usd_kit: number;
@@ -16,12 +23,16 @@ type BudgetSettings = {
 };
 
 /**
- * Cuántas landings puede crear un alumno cada 30 días: el % (por defecto 3 %) de lo que paga al mes,
+ * Cuántas landings puede crear un alumno cada 30 días. Modo «fijo»: un número por tipo de alumno
+ * (academia = rol kit, mentoría 1 a 1 = rol member). Modo «porcentaje»: el % de lo que paga al mes
  * dividido por lo que cuesta cada landing. Admin y coaches no tienen límite (limit = null).
  */
 export function landingAllowance(role: string, monthlyUsd: number | null | undefined, s: BudgetSettings) {
   const cost = landingCost(s.landing_image_model);
   if (role === "admin" || role === "coach") return { limit: null, monthlyUsd: null, budget: null, cost };
+  if (s.landing_limit_mode !== "porcentaje") {
+    return { limit: Number(role === "kit" ? s.landing_monthly_kit : s.landing_monthly_member) || 0, monthlyUsd: null, budget: null, cost };
+  }
   const usd = Number(monthlyUsd ?? (role === "kit" ? s.landing_default_usd_kit : s.landing_default_usd_member)) || 0;
   const budget = (usd * Number(s.landing_budget_pct)) / 100;
   return { limit: Math.floor(budget / cost + 1e-9), monthlyUsd: usd, budget, cost };
@@ -60,7 +71,7 @@ export const FINAL_IMAGES = [
   { n: 2, slot: "beneficios", label: "Beneficios" },
   { n: 3, slot: "uso_1", label: "En uso" },
   { n: 4, slot: "producto", label: "Producto" },
-  { n: 5, slot: "uso_2", label: "En uso 2" },
+  { n: 5, slot: "uso_2", label: "Producto real" },
   { n: 6, slot: "confianza", label: "Compra verificada" },
 ] as const;
 export type FinalSlot = (typeof FINAL_IMAGES)[number]["slot"];

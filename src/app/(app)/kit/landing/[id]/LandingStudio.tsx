@@ -28,7 +28,12 @@ export type StudioProps = {
   aiUrls: Partial<Record<AiSlot, string>>;
   photoUrls: string[];
   gifUrl: string | null;
+  /** Cuántas fotos ya se rehicieron en esta landing (máx. 3). */
+  redosUsed: number;
 };
+
+const MAX_REDOS = 3;
+const REDO_SLOTS: Partial<Record<number, AiSlot>> = { 1: "principal", 3: "uso_1", 4: "producto" };
 
 const FONTS: Fonts = { display: "Anton, Impact, sans-serif", body: "Montserrat, Arial, sans-serif" };
 
@@ -60,6 +65,9 @@ export function LandingStudio(props: StudioProps) {
   const [error, setError] = useState("");
   const [frameHeight, setFrameHeight] = useState(1600);
   const bitmaps = useRef<{ ai: Partial<Record<AiSlot, ImageBitmap>>; photos: ImageBitmap[] } | null>(null);
+  const [version, setVersion] = useState(0);
+  const [redoing, setRedoing] = useState<AiSlot | null>(null);
+  const [redosLeft, setRedosLeft] = useState(Math.max(MAX_REDOS - props.redosUsed, 0));
 
   // Dibuja las 6 imágenes finales (y las vuelve a dibujar si cambias color, tienda o franja).
   useEffect(() => {
@@ -86,7 +94,22 @@ export function LandingStudio(props: StudioProps) {
             im.slot === "confianza"
               ? await composeTrust(brand, FONTS)
               : await composeImage(
-                  { slot: im.slot, ai: ai[im.slot] ?? null, photo: photos.length ? photos[i % photos.length] : null, recuadro: r.recuadro, beneficios: r.beneficios_imagen },
+                  {
+                    slot: im.slot,
+                    // Beneficios: si la landing es de las nuevas (3 fotos), se arma con la foto premium del producto.
+                    // Imagen 5: la foto real del alumno (en landings viejas, su foto de IA).
+                    ai: im.slot === "beneficios" ? ai.beneficios ?? null : im.slot === "uso_2" ? ai.uso_2 ?? null : ai[im.slot] ?? null,
+                    photo:
+                      im.slot === "beneficios"
+                        ? ai.producto ?? photos[0] ?? null
+                        : im.slot === "uso_2"
+                          ? photos[0] ?? null
+                          : photos.length
+                            ? photos[i % photos.length]
+                            : null,
+                    recuadro: r.recuadro,
+                    beneficios: r.beneficios_imagen,
+                  },
                   brand,
                   FONTS,
                 );
@@ -107,7 +130,30 @@ export function LandingStudio(props: StudioProps) {
       cancelled = true;
       clearTimeout(t);
     };
-  }, [brand, props.aiUrls, props.photoUrls, r.recuadro, r.beneficios_imagen]);
+  }, [brand, props.aiUrls, props.photoUrls, r.recuadro, r.beneficios_imagen, version]);
+
+  /** Rehace solo una foto con IA (sin gastar una landing nueva). */
+  async function redo(slot: AiSlot) {
+    setRedoing(slot);
+    setError("");
+    try {
+      const supabase = createClient();
+      const { data, error: fnError } = await supabase.functions.invoke("makedrop-landing", { body: { id: props.landingId, slot } });
+      if (fnError) {
+        const detail = await (fnError as { context?: Response }).context?.json?.().catch(() => null);
+        throw new Error(detail?.error ?? fnError.message);
+      }
+      const { data: signed } = await supabase.storage.from(LANDING_BUCKET).createSignedUrl(data.path, 3600);
+      if (!signed?.signedUrl || !bitmaps.current) throw new Error("No se pudo cargar la foto nueva");
+      bitmaps.current.ai[slot] = await loadBitmap(signed.signedUrl);
+      setRedosLeft(typeof data.left === "number" ? data.left : redosLeft - 1);
+      setVersion((v) => v + 1);
+    } catch (e) {
+      setError(`No se pudo rehacer la foto: ${(e as Error).message}`);
+    } finally {
+      setRedoing(null);
+    }
+  }
 
   const hasGif = Boolean(props.gifUrl);
   const shopifyHtml = useMemo(
@@ -207,15 +253,41 @@ export function LandingStudio(props: StudioProps) {
               )}
             </div>
             <div className="mt-2 grid grid-cols-6 gap-1.5">
-              {FINAL_IMAGES.map((im) =>
-                finals[im.n] ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img key={im.n} src={finals[im.n].url} alt={im.label} className="aspect-square w-full rounded-md object-cover" />
-                ) : (
-                  <div key={im.n} className="aspect-square rounded-md bg-zinc-100" />
-                ),
-              )}
+              {FINAL_IMAGES.map((im) => {
+                const slot = REDO_SLOTS[im.n];
+                return (
+                  <div key={im.n} className="space-y-1">
+                    <div className="relative">
+                      {finals[im.n] ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={finals[im.n].url} alt={im.label} className="aspect-square w-full rounded-md object-cover" />
+                      ) : (
+                        <div className="aspect-square rounded-md bg-zinc-100" />
+                      )}
+                      {redoing && redoing === slot && (
+                        <div className="absolute inset-0 flex items-center justify-center rounded-md bg-white/70">
+                          <Loader2 className="size-4 animate-spin text-brand" />
+                        </div>
+                      )}
+                    </div>
+                    {slot && (
+                      <button
+                        type="button"
+                        onClick={() => redo(slot)}
+                        disabled={redoing !== null || redosLeft === 0 || !ready}
+                        className="w-full rounded-md border border-zinc-200 px-1 py-0.5 text-[10px] font-semibold text-zinc-600 hover:border-brand disabled:opacity-40"
+                        title={redosLeft === 0 ? "Ya rehiciste 3 fotos en esta landing" : "Rehacer solo esta foto"}
+                      >
+                        Rehacer
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
             </div>
+            <p className="mt-1 text-[11px] text-zinc-500">
+              ¿Una foto no quedó bien? Pulsa «Rehacer» debajo de ella. Te quedan {redosLeft} de {MAX_REDOS}.
+            </p>
           </div>
           <div>
             <h2 className="text-lg leading-snug font-bold sm:text-xl">{r.titulo}</h2>

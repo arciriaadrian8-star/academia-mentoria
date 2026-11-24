@@ -80,6 +80,7 @@ export default async function LandingResultPage({ params }: { params: Promise<{ 
     aiUrls: Object.fromEntries(Object.entries(images).map(([slot, path]) => [slot, urlOf(path)]).filter(([, u]) => u)),
     photoUrls: photoPaths.map(urlOf).filter(Boolean),
     gifUrl: row.gif_path ? urlOf(row.gif_path) || null : null,
+    redosUsed: Number(row.result?.rehechas ?? 0),
   };
 
   return (

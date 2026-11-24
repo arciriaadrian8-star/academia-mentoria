@@ -120,9 +120,10 @@ export default async function MemberPage({
             <p className="mt-1 text-xs text-zinc-500">
               {(() => {
                 const a = landingAllowance(member.role, billingRes.data?.monthly_usd, settings);
-                return a.limit === null
-                  ? "Admin y coaches no tienen límite de landings."
-                  : `Con el ${settings.landing_budget_pct} % de su pago puede crear ${a.limit} landing${a.limit === 1 ? "" : "s"} con IA cada 30 días.`;
+                if (a.limit === null) return "Admin y coaches no tienen límite de landings.";
+                return settings.landing_limit_mode === "porcentaje"
+                  ? `Con el ${settings.landing_budget_pct} % de su pago puede crear ${a.limit} landing${a.limit === 1 ? "" : "s"} con IA cada 30 días.`
+                  : `Límite fijo (Ajustes): ${a.limit} landing${a.limit === 1 ? "" : "s"} con IA cada 30 días. El pago solo cuenta en el modo porcentaje.`;
               })()}
             </p>
           </div>

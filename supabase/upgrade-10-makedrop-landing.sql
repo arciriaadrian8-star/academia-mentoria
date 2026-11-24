@@ -50,6 +50,9 @@ grant all on public.ai_landings to service_role;
 
 -- Presupuesto de IA: cada alumno puede gastar en landings un % de lo que paga al mes (el admin lo ajusta en Ajustes)
 alter table public.settings
+  add column if not exists landing_limit_mode text not null default 'fijo' check (landing_limit_mode in ('fijo', 'porcentaje')),
+  add column if not exists landing_monthly_kit int not null default 5 check (landing_monthly_kit between 0 and 100),
+  add column if not exists landing_monthly_member int not null default 20 check (landing_monthly_member between 0 and 500),
   add column if not exists landing_budget_pct numeric(5,2) not null default 3 check (landing_budget_pct between 0 and 100),
   add column if not exists landing_image_model text not null default 'gemini-3.1-flash-image-preview'
     check (landing_image_model in ('gemini-3.1-flash-image-preview', 'gemini-2.5-flash-image')),

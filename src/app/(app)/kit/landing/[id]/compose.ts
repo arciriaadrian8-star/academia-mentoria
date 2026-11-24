@@ -275,9 +275,15 @@ export async function composeImage(input: ComposeInput, brand: Brand, fonts: Fon
           ctx.shadowBlur = 0;
           contain(ctx, photo, 650, 270, 370, 520);
         } else {
-          ctx.shadowColor = "rgba(0,0,0,0.5)";
+          // Foto oscura (p. ej. la foto premium del producto hecha con IA): tarjeta redondeada con la foto completa.
+          ctx.shadowColor = "rgba(0,0,0,0.55)";
           ctx.shadowBlur = 40;
-          contain(ctx, photo, 600, 230, 440, 600);
+          roundRect(ctx, 630, 250, 410, 560, 28);
+          ctx.fillStyle = "#09090b";
+          ctx.fill();
+          ctx.shadowBlur = 0;
+          ctx.clip();
+          cover(ctx, photo, 630, 250, 410, 560);
         }
         ctx.restore();
       }

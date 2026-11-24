@@ -1,8 +1,11 @@
 // MakeDrop Landing: genera con Gemini el texto completo de una landing para Shopify
-// (estructura definitiva + preguntas frecuentes) y las 5 fotos base con Nano Banana.
+// (estructura definitiva + preguntas frecuentes) y 3 fotos con IA (máx. ~COP 575 por landing):
+//   2 con personas en Nano Banana 2 (calidad máxima) + 1 del producto solo en Nano Banana (económico).
+//   La infografía de beneficios, la foto real del alumno y «Compra verificada» se arman con código.
 // POST { id } con el JWT del alumno. Responde 202 y sigue en segundo plano en 2 fases:
 //   "text"   → escribe todos los textos y las escenas de cada foto
-//   "images" → genera las 5 fotos tomando como referencia la foto del producto del alumno
+//   "images" → genera las 3 fotos tomando como referencia la foto del producto del alumno
+// POST { id, slot } con el JWT del alumno: rehace solo esa foto (máx. 3 veces por landing).
 // Los sellos, franjas y la lista de beneficios se dibujan después en el navegador del alumno.
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -10,10 +13,13 @@ const GEMINI = "https://generativelanguage.googleapis.com";
 const key = () => (Deno.env.get("GEMINI_API_KEY") ?? Deno.env.get("GEMINI_KEY") ?? Deno.env.get("GOOGLE_API_KEY") ?? "").trim();
 const TEXT_MODELS = [Deno.env.get("GEMINI_MODEL"), "gemini-flash-latest", "gemini-2.5-flash", "gemini-flash-lite-latest", "gemini-2.5-flash-lite"].filter(Boolean) as string[];
 const IMAGE_MODELS = [Deno.env.get("GEMINI_IMAGE_MODEL"), "gemini-3.1-flash-image-preview", "gemini-2.5-flash-image"].filter(Boolean) as string[];
-// Costo aproximado de una landing (5 fotos + texto) en USD, según el modelo de imágenes.
-const LANDING_COST: Record<string, number> = { "gemini-3.1-flash-image-preview": 0.4, "gemini-2.5-flash-image": 0.2 };
+const NANO_2 = "gemini-3.1-flash-image-preview";
+const NANO_ECO = "gemini-2.5-flash-image";
+// Costo aproximado de una landing (3 fotos + texto) en USD, según el modelo de las fotos con personas.
+const LANDING_COST: Record<string, number> = { [NANO_2]: 0.15, [NANO_ECO]: 0.1 };
+const MAX_REDOS = 3;
 const BUCKET = "makedrop";
-const SLOTS = ["principal", "beneficios", "uso_1", "producto", "uso_2"] as const;
+const SLOTS = ["principal", "uso_1", "producto"] as const;
 type Slot = (typeof SLOTS)[number];
 
 const cors = {
@@ -68,8 +74,8 @@ const SCHEMA = {
     persona: str,
     escenas: {
       type: "object",
-      properties: { principal: str, beneficios: str, uso_1: str, producto: str, uso_2: str },
-      required: ["principal", "beneficios", "uso_1", "producto", "uso_2"],
+      properties: { principal: str, uso_1: str, producto: str },
+      required: ["principal", "uso_1", "producto"],
     },
   },
   required: ["titulo", "nombre_marca", "barra_anuncio", "recuadro", "beneficios_imagen", "bloques", "faq", "seo", "tipo_producto", "etiquetas", "producto_visual", "persona", "escenas"],
@@ -127,10 +133,8 @@ PARA LAS FOTOS (en INGLÉS, las usa un generador de imágenes)
 - "persona": el cliente ideal que aparece en las fotos (edad, género, rasgos latinos, ropa) — debe ser coherente en todas.
 - "escenas": una escena por foto, en inglés, 1-2 frases, sin texto en la imagen:
    principal: the person smiling at the camera and holding the product close to their chest with both hands (arms bent, not extended), simple warm studio background.
-   beneficios: the product alone on the RIGHT side, with elements related to its ingredients/features flying or arranged around it, on a deep colored background that matches the product colors; the LEFT 55% must be a clean empty area of that background color.
    uso_1: the person using/enjoying the product in a real everyday moment of their life (where the problem happens).
    producto: premium hero shot of the product alone on a dark elegant background with dramatic light.
-   uso_2: a DIFFERENT person (another gender or age of the same target) using the product, happy, in another real setting.
 
 REGLAS
 - Español latino natural de ${r.country}, frases cortas, tono de amigo, emojis con moderación (solo en títulos y viñetas).
@@ -142,15 +146,13 @@ Responde SOLO con el JSON del esquema.`;
 
 const SLOT_SPEC: Record<Slot, string> = {
   principal: "Medium shot from the waist up. The person is placed slightly to the LEFT and LOWER in the frame: the head must be below the top 35% of the image and away from the right side. The entire TOP-RIGHT quarter of the image must be plain, empty background (a text box will cover it). The product is held close to the chest, clearly visible, at its real size.",
-  beneficios: "The product occupies the right 45% of the frame. The left 55% is an empty, clean area of the background color (no objects, no text).",
   uso_1: "Candid lifestyle photo, natural light, the product clearly visible and recognizable.",
   producto: "Product centered, large, filling about 60% of the frame, premium studio look.",
-  uso_2: "Candid lifestyle photo with a different person, natural light, the product clearly visible and recognizable.",
 };
 
 function imagePrompt(slot: Slot, result: Record<string, unknown>, hasPhotos: boolean) {
   const escenas = (result.escenas ?? {}) as Record<string, string>;
-  const peopleSlot = slot === "principal" || slot === "uso_1" || slot === "uso_2";
+  const peopleSlot = slot === "principal" || slot === "uso_1";
   return [
     "Ultra realistic commercial advertising photograph for a Latin American e-commerce product page. Square 1:1 image.",
     `Scene: ${escenas[slot] ?? ""}`,
@@ -185,7 +187,8 @@ async function generateText(parts: Part[]) {
           contents: [{ role: "user", parts }],
           generationConfig: thinking ? { ...base, thinkingConfig: thinking } : base,
         });
-      let res = await call({ thinkingLevel: "low" });
+      // Sin «razonamiento extra»: es lo que más encarece el texto y no mejora esta tarea.
+      let res = await call({ thinkingLevel: "minimal" });
       if (res.status === 400) res = await call({ thinkingBudget: 0 });
       if (res.status === 400) res = await call(null);
       if (res.status === 404) {
@@ -336,7 +339,28 @@ async function phaseText(id: string, selfUrl: string) {
   }
 }
 
-/** Fase 2: las 5 fotos base con Nano Banana (en paralelo). Si fallan, la landing sale igual con las fotos del alumno. */
+/** Modelo para las fotos con personas (Ajustes); por defecto Nano Banana 2. */
+async function peopleModel() {
+  const { data: cfg } = await adminClient().from("settings").select("landing_image_model").eq("id", 1).maybeSingle();
+  return (cfg?.landing_image_model as string | undefined) || NANO_2;
+}
+
+/** Fotos con personas: el modelo de calidad primero. Producto solo: el económico primero (casi no se nota la diferencia). */
+function modelsFor(slot: Slot, preferred: string) {
+  const first = slot === "producto" ? NANO_ECO : preferred;
+  return [first, ...IMAGE_MODELS.filter((m) => m !== first)];
+}
+
+async function makeSlotImage(row: Row, slot: Slot, result: Record<string, unknown>, refs: Part[], preferred: string) {
+  const img = await generateImage(imagePrompt(slot, result, refs.length > 0), refs, modelsFor(slot, preferred));
+  const ext = img.mime.includes("jpeg") ? "jpg" : img.mime.includes("webp") ? "webp" : "png";
+  const path = `${row.user_id}/${row.id}/base-${slot}.${ext}`;
+  const { error } = await adminClient().storage.from(BUCKET).upload(path, fromBase64(img.data), { contentType: img.mime, upsert: true });
+  if (error) throw new Error(`No se pudo guardar la imagen: ${error.message}`);
+  return { path, model: img.model };
+}
+
+/** Fase 2: las 3 fotos con IA (en paralelo). Si fallan, la landing sale igual con las fotos del alumno. */
 async function phaseImages(id: string) {
   const row = await claim(id, "imagenes_pendiente", "imagenes");
   if (!row) return;
@@ -345,10 +369,7 @@ async function phaseImages(id: string) {
   delete result._stage;
   try {
     const refs = (await loadPhotos(row)).slice(0, 2);
-    // El modelo elegido en Ajustes va primero; el otro queda de respaldo.
-    const { data: cfg } = await admin.from("settings").select("landing_image_model").eq("id", 1).maybeSingle();
-    const preferred = cfg?.landing_image_model as string | undefined;
-    const models = preferred ? [preferred, ...IMAGE_MODELS.filter((m) => m !== preferred)] : IMAGE_MODELS;
+    const preferred = await peopleModel();
     const images: Record<string, string> = {};
     const errors: string[] = [];
     let billing = false;
@@ -356,13 +377,9 @@ async function phaseImages(id: string) {
     await Promise.all(
       SLOTS.map(async (slot) => {
         try {
-          const img = await generateImage(imagePrompt(slot, result, refs.length > 0), refs, models);
-          imageModel = img.model;
-          const ext = img.mime.includes("jpeg") ? "jpg" : img.mime.includes("webp") ? "webp" : "png";
-          const path = `${row.user_id}/${row.id}/base-${slot}.${ext}`;
-          const { error } = await admin.storage.from(BUCKET).upload(path, fromBase64(img.data), { contentType: img.mime, upsert: true });
-          if (error) throw new Error(`No se pudo guardar la imagen: ${error.message}`);
-          images[slot] = path;
+          const saved = await makeSlotImage(row, slot, result, refs, preferred);
+          if (slot !== "producto") imageModel = saved.model;
+          images[slot] = saved.path;
         } catch (e) {
           if (e instanceof ImageError && e.billing) billing = true;
           errors.push(`${slot}: ${String((e as Error)?.message ?? e).slice(0, 200)}`);
@@ -372,7 +389,7 @@ async function phaseImages(id: string) {
     const aviso = billing
       ? "Las fotos con IA necesitan saldo en la cuenta de Gemini de la academia. Armamos la landing con tus fotos del producto."
       : errors.length
-        ? `${errors.length} de 5 fotos no se pudieron generar; en su lugar usamos tu foto del producto.`
+        ? `${errors.length} de ${SLOTS.length} fotos no se pudieron generar; en su lugar usamos tu foto del producto.`
         : null;
     await admin
       .from("ai_landings")
@@ -397,7 +414,7 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "Método no permitido" }, 405);
 
-  const { id, phase } = await req.json().catch(() => ({}));
+  const { id, phase, slot } = await req.json().catch(() => ({}));
   if (!id || typeof id !== "string") return json({ error: "Falta el id" }, 400);
   const selfUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/makedrop-landing`;
 
@@ -421,6 +438,30 @@ Deno.serve(async (req) => {
 
   const { data: row } = await userClient.from("ai_landings").select("id, user_id, status, result").eq("id", id).maybeSingle();
   if (!row || row.user_id !== user.id) return json({ error: "No encontrado" }, 404);
+
+  // Rehacer solo una foto (máx. MAX_REDOS por landing): se responde cuando la foto está lista.
+  if (slot) {
+    if (!SLOTS.includes(slot)) return json({ error: "Esa foto no se puede rehacer" }, 400);
+    if (row.status !== "listo" || !row.result?.titulo) return json({ error: "La landing aún no está lista" }, 409);
+    const redos = Number(row.result?.rehechas ?? 0);
+    if (redos >= MAX_REDOS) return json({ error: `Ya rehiciste ${MAX_REDOS} fotos en esta landing.` }, 429);
+    const admin = adminClient();
+    const { data: prof } = await admin.from("profiles").select("active").eq("id", user.id).single();
+    if (!prof?.active) return json({ error: "Cuenta inactiva" }, 403);
+    const { data: full } = await admin.from("ai_landings").select("*").eq("id", id).single();
+    try {
+      const refs = (await loadPhotos(full as Row)).slice(0, 2);
+      const saved = await makeSlotImage(full as Row, slot as Slot, full.result, refs, await peopleModel());
+      await admin
+        .from("ai_landings")
+        .update({ images: { ...(full.images ?? {}), [slot]: saved.path }, result: { ...full.result, rehechas: redos + 1 } })
+        .eq("id", id);
+      return json({ ok: true, path: saved.path, left: MAX_REDOS - redos - 1 });
+    } catch (e) {
+      return json({ error: String((e as Error)?.message ?? e).slice(0, 300) }, 502);
+    }
+  }
+
   if (row.status !== "procesando" || row.result) return json({ ok: true, status: row.status });
 
   const admin = adminClient();
@@ -430,16 +471,21 @@ Deno.serve(async (req) => {
     return json({ error: "Acceso vencido" }, 403);
   }
   if (profile.role !== "admin" && profile.role !== "coach") {
-    // Presupuesto: el % (Ajustes, por defecto 3 %) de lo que paga el alumno al mes, dividido por el costo de cada landing.
+    // Límite (Ajustes): fijo por mes, o el % de lo que paga el alumno dividido por el costo de cada landing.
     const { data: settings } = await admin
       .from("settings")
-      .select("landing_budget_pct, landing_image_model, landing_default_usd_kit, landing_default_usd_member")
+      .select("landing_limit_mode, landing_monthly_kit, landing_monthly_member, landing_budget_pct, landing_image_model, landing_default_usd_kit, landing_default_usd_member")
       .eq("id", 1)
       .maybeSingle();
-    const { data: billing } = await admin.from("member_billing").select("monthly_usd").eq("user_id", user.id).maybeSingle();
-    const usd = Number(billing?.monthly_usd ?? (profile.role === "kit" ? settings?.landing_default_usd_kit : settings?.landing_default_usd_member) ?? 14);
-    const cost = LANDING_COST[settings?.landing_image_model ?? ""] ?? 0.4;
-    const limit = Math.floor((usd * Number(settings?.landing_budget_pct ?? 3)) / 100 / cost + 1e-9);
+    let limit: number;
+    if ((settings?.landing_limit_mode ?? "fijo") === "fijo") {
+      limit = Number(profile.role === "kit" ? settings?.landing_monthly_kit ?? 5 : settings?.landing_monthly_member ?? 20);
+    } else {
+      const { data: billing } = await admin.from("member_billing").select("monthly_usd").eq("user_id", user.id).maybeSingle();
+      const usd = Number(billing?.monthly_usd ?? (profile.role === "kit" ? settings?.landing_default_usd_kit : settings?.landing_default_usd_member) ?? 14);
+      const cost = LANDING_COST[settings?.landing_image_model ?? ""] ?? 0.15;
+      limit = Math.floor((usd * Number(settings?.landing_budget_pct ?? 3)) / 100 / cost + 1e-9);
+    }
     const since = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
     const { count } = await admin.from("ai_landings").select("id", { count: "exact", head: true }).eq("user_id", user.id).gte("created_at", since);
     if ((count ?? 0) > limit) {

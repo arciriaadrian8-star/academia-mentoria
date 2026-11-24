@@ -6,7 +6,7 @@ import { FormMessage } from "@/components/FormMessage";
 import { ImageUpload } from "@/components/ImageUpload";
 import { PageHeader } from "@/components/PageHeader";
 import { SubmitButton } from "@/components/SubmitButton";
-import { IMAGE_MODELS, landingAllowance } from "@/lib/landing";
+import { IMAGE_MODELS, landingAllowance, landingCostCop } from "@/lib/landing";
 import { updateSettings } from "./actions";
 
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ guardado?: string }> }) {
@@ -79,45 +79,83 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           )}
         </fieldset>
 
-        <fieldset className="space-y-3 rounded-xl border border-zinc-200 p-4">
+        <fieldset className="space-y-4 rounded-xl border border-zinc-200 p-4">
           <legend className="px-1 text-sm font-semibold">MakeDrop Landing (IA)</legend>
           <p className="text-xs text-zinc-500">
-            Cada alumno puede gastar en landings un porcentaje de lo que paga al mes. Pon cuánto paga cada uno en su ficha de Miembros; si no lo pones, se usa el pago por defecto. Tú y los coaches no tienen límite.
+            Cada landing usa 3 fotos con IA: 2 con personas en el modelo que elijas y 1 del producto en el modelo económico. Tú y los coaches no tienen límite.
           </p>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <label className="label" htmlFor="landing_budget_pct">% del pago mensual para IA</label>
-              <input id="landing_budget_pct" name="landing_budget_pct" type="number" min={0} max={100} step="0.5" defaultValue={settings.landing_budget_pct} className="input" />
-            </div>
-            <div>
-              <label className="label" htmlFor="landing_image_model">Modelo de imágenes</label>
-              <select id="landing_image_model" name="landing_image_model" defaultValue={settings.landing_image_model} className="input">
-                {IMAGE_MODELS.map((m) => (
-                  <option key={m.id} value={m.id}>{m.label} (~{m.costUsd.toFixed(2)} USD por landing)</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="label" htmlFor="landing_default_usd_kit">Pago por defecto · Academia (USD/mes)</label>
-              <input id="landing_default_usd_kit" name="landing_default_usd_kit" type="number" min={0} step="0.01" defaultValue={settings.landing_default_usd_kit} className="input" />
-            </div>
-            <div>
-              <label className="label" htmlFor="landing_default_usd_member">Pago por defecto · Mentoría 1 a 1 (USD/mes)</label>
-              <input id="landing_default_usd_member" name="landing_default_usd_member" type="number" min={0} step="0.01" defaultValue={settings.landing_default_usd_member} className="input" />
-            </div>
+          <div>
+            <label className="label" htmlFor="landing_image_model">Modelo de las fotos con personas</label>
+            <select id="landing_image_model" name="landing_image_model" defaultValue={settings.landing_image_model} className="input">
+              {IMAGE_MODELS.map((m) => (
+                <option key={m.id} value={m.id}>{m.label} (~COP {m.costCop} por landing)</option>
+              ))}
+            </select>
           </div>
+
+          <div className="space-y-2">
+            <span className="label">Límite de landings cada 30 días</span>
+            <label className="flex items-start gap-2 text-sm">
+              <input type="radio" name="landing_limit_mode" value="fijo" defaultChecked={settings.landing_limit_mode !== "porcentaje"} className="mt-0.5 accent-brand" />
+              <span>
+                <span className="font-medium">Número fijo por tipo de alumno</span>
+                <span className="mt-2 grid gap-3 sm:grid-cols-2">
+                  <span>
+                    <span className="block text-xs text-zinc-500">Academia MakeDrop IA (rol «Solo Kit»)</span>
+                    <input name="landing_monthly_kit" type="number" min={0} max={100} defaultValue={settings.landing_monthly_kit} className="input mt-1" aria-label="Landings al mes para la academia" />
+                  </span>
+                  <span>
+                    <span className="block text-xs text-zinc-500">Mentoría 1 a 1 (rol «Miembro»)</span>
+                    <input name="landing_monthly_member" type="number" min={0} max={500} defaultValue={settings.landing_monthly_member} className="input mt-1" aria-label="Landings al mes para la mentoría" />
+                  </span>
+                </span>
+              </span>
+            </label>
+            <label className="flex items-start gap-2 text-sm">
+              <input type="radio" name="landing_limit_mode" value="porcentaje" defaultChecked={settings.landing_limit_mode === "porcentaje"} className="mt-0.5 accent-brand" />
+              <span>
+                <span className="font-medium">Porcentaje de lo que paga cada alumno</span>
+                <span className="block text-xs text-zinc-500">Pon cuánto paga cada uno en su ficha de Miembros; si no, se usa el pago por defecto.</span>
+                <span className="mt-2 grid gap-3 sm:grid-cols-3">
+                  <span>
+                    <span className="block text-xs text-zinc-500">% del pago mensual</span>
+                    <input name="landing_budget_pct" type="number" min={0} max={100} step="0.5" defaultValue={settings.landing_budget_pct} className="input mt-1" aria-label="Porcentaje del pago mensual" />
+                  </span>
+                  <span>
+                    <span className="block text-xs text-zinc-500">Pago por defecto academia (USD)</span>
+                    <input name="landing_default_usd_kit" type="number" min={0} step="0.01" defaultValue={settings.landing_default_usd_kit} className="input mt-1" aria-label="Pago por defecto academia" />
+                  </span>
+                  <span>
+                    <span className="block text-xs text-zinc-500">Pago por defecto mentoría (USD)</span>
+                    <input name="landing_default_usd_member" type="number" min={0} step="0.01" defaultValue={settings.landing_default_usd_member} className="input mt-1" aria-label="Pago por defecto mentoría" />
+                  </span>
+                </span>
+              </span>
+            </label>
+          </div>
+
           <div className="rounded-lg bg-zinc-50 p-3 text-xs text-zinc-600">
-            <p className="font-semibold text-zinc-800">Con la configuración guardada:</p>
-            <ul className="mt-1 space-y-0.5">
-              {[12, 14, 19, 100, 500].map((usd) => {
-                const a = landingAllowance("kit", usd, settings);
-                return (
-                  <li key={usd}>
-                    Paga {usd} USD → presupuesto {a.budget?.toFixed(2)} USD → <strong>{a.limit} landing{a.limit === 1 ? "" : "s"}</strong> cada 30 días
-                  </li>
-                );
-              })}
-            </ul>
+            {settings.landing_limit_mode === "porcentaje" ? (
+              <>
+                <p className="font-semibold text-zinc-800">Con el {settings.landing_budget_pct} % guardado:</p>
+                <ul className="mt-1 space-y-0.5">
+                  {[12, 14, 19, 100, 500].map((usd) => {
+                    const a = landingAllowance("kit", usd, { ...settings, landing_limit_mode: "porcentaje" });
+                    return (
+                      <li key={usd}>
+                        Paga {usd} USD → <strong>{a.limit} landing{a.limit === 1 ? "" : "s"}</strong> cada 30 días
+                      </li>
+                    );
+                  })}
+                </ul>
+              </>
+            ) : (
+              <p>
+                <span className="font-semibold text-zinc-800">Gasto máximo por alumno al mes:</span> academia ~COP{" "}
+                {(settings.landing_monthly_kit * landingCostCop(settings.landing_image_model)).toLocaleString("es-CO")} · mentoría ~COP{" "}
+                {(settings.landing_monthly_member * landingCostCop(settings.landing_image_model)).toLocaleString("es-CO")}
+              </p>
+            )}
           </div>
         </fieldset>
 

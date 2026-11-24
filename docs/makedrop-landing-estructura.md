@@ -99,3 +99,26 @@ Las imágenes de la descripción reutilizan las de la galería (en el ejemplo: G
 **Cómo llega a Shopify:** botón «Descargar archivo para Shopify» → Productos → Importar. Crea el producto en borrador con título, precios, imágenes y la landing completa. El alumno activa Releasit y lo publica. También hay ZIP con imágenes y textos, y botones para copiar.
 
 **Límites:** 4 landings cada 30 días por alumno; admin y coaches sin límite.
+
+## 5. Estructura de imágenes v2 (referencia: pidelisto.store · pistola de pintura)
+
+Las imágenes VENDEN SOLAS: cada una tiene un titular grande y el precio. La descripción casi no lleva texto.
+
+**Plantilla fija en las 7 imágenes (1024×1024):**
+- Franja superior amarilla con TITULAR grande en mayúsculas, negro, letra condensada (máx. 2 líneas). Habla de "usted", directo.
+- Centro: la foto (cambia según la imagen).
+- Franja inferior roja: nombre corto del producto en blanco + etiqueta amarilla con el precio + "Envío gratis · Paga al recibir".
+
+**Las 7 imágenes en orden:**
+1. **Oferta:** "Pinte su casa sin pagar pintor" → producto protagonista + sello rojo "MITAD DE PRECIO" + "Antes $245.800" tachado.
+2. **Antes / Después:** "Así queda su casa para diciembre" → foto partida: ANTES (etiqueta roja, el problema) | DESPUÉS (etiqueta verde, persona feliz con el producto).
+3. **Qué le llega:** "Esto le llega a su casa" → producto en fondo blanco con etiquetas de cada pieza (vaso 800 ml, 3 boquillas, cable).
+4. **Usos:** "Pinte todo usted mismo" → cuadrícula 2×2, cada foto con su etiqueta (PINTA PAREDES / REJAS / PUERTAS / MUEBLES).
+5. **Comparación / ahorro:** "Deje de pagarle al pintor" → 2 paneles: "PAGARLE AL PINTOR" ✗ (le cobra el día) | "CON SU PISTOLA" ✓ (lo hace usted en una tarde).
+6. **Aspiracional / temporada:** "La casa lista para la Navidad" → familia feliz en el resultado + subtítulo ("Pintada por usted antes del 24").
+7. **Confianza:** "Paga cuando lo tenga en sus manos" → repartidor entregando la caja + 4 íconos: Envío gratis · Paga al recibir · Llega en 2 a 5 días · Cambio si llega con defecto.
+8. Foto limpia del producto (la del proveedor).
+
+**La página:** barra "Envío GRATIS + Paga al Recibir" · gancho en pregunta ("¿Diciembre y la casa sin pintar?") · estrellas · precio −50 % · "Llega en 2 a 5 días" · botón con beneficio ("QUIERO PINTAR MI CASA") · bloque de confianza (pagas al recibir, confirmamos por WhatsApp, garantía, derecho de retracto Ley 1480) · reseñas con fotos (app) · secciones título + imagen + 1 frase · tabla "Rodillo y brocha vs Pistola" · "¿Qué va a pintar?" · precio + botón · cómo se usa (3 pasos) · "Antes de pedir" (avisos honestos) · 4 preguntas frecuentes · botón final.
+
+**Cómo lo hace el agente sin gastar más (~COP 575):** 3 llamadas de IA → (1) persona feliz con el producto, (2) cuadrícula 2×2 de usos en UNA sola imagen, (3) escena del problema para el ANTES. Las franjas, titulares, precio, sellos, etiquetas, paneles ✗/✓ e íconos se dibujan con código. Producto y "qué le llega" con la foto del alumno. Confianza con una escena de entrega genérica hecha una sola vez y reutilizada.

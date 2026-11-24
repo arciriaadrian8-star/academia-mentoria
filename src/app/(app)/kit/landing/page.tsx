@@ -1,20 +1,20 @@
 import Link from "next/link";
 import { ArrowLeft, CheckCircle2, Clock, XCircle } from "lucide-react";
 import { getSettings, requireKit } from "@/lib/auth";
-import { LANDING_TOOL_NAME, landingAllowance } from "@/lib/landing";
+import { getPointsBalance, LANDING_TOOL_NAME } from "@/lib/landing";
 import { timeAgo } from "@/lib/utils";
 import { EmptyState, PageHeader } from "@/components/PageHeader";
 import { LandingForm } from "./LandingForm";
 
 export default async function LandingToolPage() {
-  const { supabase, user, profile } = await requireKit();
-  const { data: billing } = await supabase.from("member_billing").select("monthly_usd").eq("user_id", user.id).maybeSingle();
-  const { limit } = landingAllowance(profile.role, billing?.monthly_usd, await getSettings());
-  const since = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
-  const [{ data }, { count }] = await Promise.all([
-    supabase.from("ai_landings").select("id, product, status, created_at, result->>titulo").eq("user_id", user.id).order("created_at", { ascending: false }).limit(30),
-    supabase.from("ai_landings").select("id", { count: "exact", head: true }).eq("user_id", user.id).gte("created_at", since),
-  ]);
+  const { supabase, user } = await requireKit();
+  const [settings, points] = await Promise.all([getSettings(), getPointsBalance(supabase, user.id)]);
+  const { data } = await supabase
+    .from("ai_landings")
+    .select("id, product, status, created_at, result->>titulo")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false })
+    .limit(30);
   const rows = (data ?? []) as { id: string; product: string; status: string; created_at: string; titulo: string | null }[];
 
   return (
@@ -27,7 +27,7 @@ export default async function LandingToolPage() {
         description="Sube la foto de tu producto, tu oferta y una descripción. La IA te arma la landing completa para Shopify: título ganador, imágenes, descripción y preguntas frecuentes, lista para importar."
       />
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
-        <LandingForm userId={user.id} used={count ?? 0} limit={limit} />
+        <LandingForm userId={user.id} points={points} cost={settings.points_landing} />
         <div className="space-y-3">
           <h2 className="font-semibold">Mis landings</h2>
           {rows.length === 0 ? (

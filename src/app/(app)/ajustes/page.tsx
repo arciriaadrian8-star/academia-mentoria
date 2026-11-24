@@ -6,7 +6,7 @@ import { FormMessage } from "@/components/FormMessage";
 import { ImageUpload } from "@/components/ImageUpload";
 import { PageHeader } from "@/components/PageHeader";
 import { SubmitButton } from "@/components/SubmitButton";
-import { IMAGE_MODELS, landingAllowance, landingCostCop } from "@/lib/landing";
+import { IMAGE_MODELS, landingCostCop } from "@/lib/landing";
 import { updateSettings } from "./actions";
 
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ guardado?: string }> }) {
@@ -80,10 +80,32 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         </fieldset>
 
         <fieldset className="space-y-4 rounded-xl border border-zinc-200 p-4">
-          <legend className="px-1 text-sm font-semibold">MakeDrop Landing (IA)</legend>
+          <legend className="px-1 text-sm font-semibold">Puntos de IA (MakeDrop Landing)</legend>
           <p className="text-xs text-zinc-500">
-            Cada landing usa 3 fotos con IA: 2 con personas en el modelo que elijas y 1 del producto en el modelo económico. Tú y los coaches no tienen límite.
+            Cada alumno tiene una bolsa de puntos al mes que se recarga el día 1. Cada acción con IA descuenta puntos. Puedes darle a cada alumno sus propios puntos desde su ficha en Miembros. Tú y los coaches no gastan puntos.
           </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="label" htmlFor="points_monthly_kit">Puntos al mes · Academia</label>
+              <input id="points_monthly_kit" name="points_monthly_kit" type="number" min={0} defaultValue={settings.points_monthly_kit} className="input" />
+              <p className="hint">Alumnos «Solo Kit» (membresía).</p>
+            </div>
+            <div>
+              <label className="label" htmlFor="points_monthly_member">Puntos al mes · Mentoría 1 a 1</label>
+              <input id="points_monthly_member" name="points_monthly_member" type="number" min={0} defaultValue={settings.points_monthly_member} className="input" />
+              <p className="hint">Miembros con acceso completo.</p>
+            </div>
+            <div>
+              <label className="label" htmlFor="points_landing">Crear una landing cuesta</label>
+              <input id="points_landing" name="points_landing" type="number" min={0} defaultValue={settings.points_landing} className="input" />
+              <p className="hint">Gasto real en Gemini: ~COP {landingCostCop(settings.landing_image_model)}.</p>
+            </div>
+            <div>
+              <label className="label" htmlFor="points_redo">Rehacer una foto cuesta</label>
+              <input id="points_redo" name="points_redo" type="number" min={0} defaultValue={settings.points_redo} className="input" />
+              <p className="hint">Gasto real en Gemini: ~COP 125 a 213.</p>
+            </div>
+          </div>
           <div>
             <label className="label" htmlFor="landing_image_model">Modelo de las fotos con personas</label>
             <select id="landing_image_model" name="landing_image_model" defaultValue={settings.landing_image_model} className="input">
@@ -92,71 +114,14 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
               ))}
             </select>
           </div>
-
-          <div className="space-y-2">
-            <span className="label">Límite de landings cada 30 días</span>
-            <label className="flex items-start gap-2 text-sm">
-              <input type="radio" name="landing_limit_mode" value="fijo" defaultChecked={settings.landing_limit_mode !== "porcentaje"} className="mt-0.5 accent-brand" />
-              <span>
-                <span className="font-medium">Número fijo por tipo de alumno</span>
-                <span className="mt-2 grid gap-3 sm:grid-cols-2">
-                  <span>
-                    <span className="block text-xs text-zinc-500">Academia MakeDrop IA (rol «Solo Kit»)</span>
-                    <input name="landing_monthly_kit" type="number" min={0} max={100} defaultValue={settings.landing_monthly_kit} className="input mt-1" aria-label="Landings al mes para la academia" />
-                  </span>
-                  <span>
-                    <span className="block text-xs text-zinc-500">Mentoría 1 a 1 (rol «Miembro»)</span>
-                    <input name="landing_monthly_member" type="number" min={0} max={500} defaultValue={settings.landing_monthly_member} className="input mt-1" aria-label="Landings al mes para la mentoría" />
-                  </span>
-                </span>
-              </span>
-            </label>
-            <label className="flex items-start gap-2 text-sm">
-              <input type="radio" name="landing_limit_mode" value="porcentaje" defaultChecked={settings.landing_limit_mode === "porcentaje"} className="mt-0.5 accent-brand" />
-              <span>
-                <span className="font-medium">Porcentaje de lo que paga cada alumno</span>
-                <span className="block text-xs text-zinc-500">Pon cuánto paga cada uno en su ficha de Miembros; si no, se usa el pago por defecto.</span>
-                <span className="mt-2 grid gap-3 sm:grid-cols-3">
-                  <span>
-                    <span className="block text-xs text-zinc-500">% del pago mensual</span>
-                    <input name="landing_budget_pct" type="number" min={0} max={100} step="0.5" defaultValue={settings.landing_budget_pct} className="input mt-1" aria-label="Porcentaje del pago mensual" />
-                  </span>
-                  <span>
-                    <span className="block text-xs text-zinc-500">Pago por defecto academia (USD)</span>
-                    <input name="landing_default_usd_kit" type="number" min={0} step="0.01" defaultValue={settings.landing_default_usd_kit} className="input mt-1" aria-label="Pago por defecto academia" />
-                  </span>
-                  <span>
-                    <span className="block text-xs text-zinc-500">Pago por defecto mentoría (USD)</span>
-                    <input name="landing_default_usd_member" type="number" min={0} step="0.01" defaultValue={settings.landing_default_usd_member} className="input mt-1" aria-label="Pago por defecto mentoría" />
-                  </span>
-                </span>
-              </span>
-            </label>
-          </div>
-
-          <div className="rounded-lg bg-zinc-50 p-3 text-xs text-zinc-600">
-            {settings.landing_limit_mode === "porcentaje" ? (
-              <>
-                <p className="font-semibold text-zinc-800">Con el {settings.landing_budget_pct} % guardado:</p>
-                <ul className="mt-1 space-y-0.5">
-                  {[12, 14, 19, 100, 500].map((usd) => {
-                    const a = landingAllowance("kit", usd, { ...settings, landing_limit_mode: "porcentaje" });
-                    return (
-                      <li key={usd}>
-                        Paga {usd} USD → <strong>{a.limit} landing{a.limit === 1 ? "" : "s"}</strong> cada 30 días
-                      </li>
-                    );
-                  })}
-                </ul>
-              </>
-            ) : (
-              <p>
-                <span className="font-semibold text-zinc-800">Gasto máximo por alumno al mes:</span> academia ~COP{" "}
-                {(settings.landing_monthly_kit * landingCostCop(settings.landing_image_model)).toLocaleString("es-CO")} · mentoría ~COP{" "}
-                {(settings.landing_monthly_member * landingCostCop(settings.landing_image_model)).toLocaleString("es-CO")}
-              </p>
-            )}
-          </div>
+          <p className="rounded-lg bg-zinc-50 p-3 text-xs text-zinc-600">
+            Con {settings.points_monthly_kit} puntos un alumno de la academia puede crear{" "}
+            <strong>{settings.points_landing ? Math.floor(settings.points_monthly_kit / settings.points_landing) : "∞"} landings</strong> al mes
+            {settings.points_redo && settings.points_landing
+              ? ` y le sobran ${settings.points_monthly_kit % settings.points_landing} puntos (${Math.floor((settings.points_monthly_kit % settings.points_landing) / settings.points_redo)} fotos para rehacer)`
+              : ""}
+            .
+          </p>
         </fieldset>
 
         <div className="flex justify-end">

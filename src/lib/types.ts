@@ -31,14 +31,13 @@ export interface Settings {
   welcome_message: string | null;
   allow_signup: boolean;
   auto_approve: boolean;
-  /** MakeDrop Landing: % del pago mensual de cada alumno que puede gastar en IA, modelo de imágenes y pago por defecto. */
-  landing_limit_mode: "fijo" | "porcentaje";
-  landing_monthly_kit: number;
-  landing_monthly_member: number;
-  landing_budget_pct: number;
+  /** MakeDrop Landing: modelo de las fotos con personas. */
   landing_image_model: string;
-  landing_default_usd_kit: number;
-  landing_default_usd_member: number;
+  /** Puntos de IA: bolsa mensual por defecto (academia = rol kit, mentoría = rol member) y costo de cada acción. */
+  points_monthly_kit: number;
+  points_monthly_member: number;
+  points_landing: number;
+  points_redo: number;
 }
 
 export interface Course {

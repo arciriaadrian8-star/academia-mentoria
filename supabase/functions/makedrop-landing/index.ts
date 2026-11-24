@@ -8,7 +8,9 @@
 // POST { id } con el JWT del alumno. Responde 202 y sigue en segundo plano en 2 fases:
 //   "text"   → escribe todos los textos y las escenas de cada foto
 //   "images" → genera las 3 fotos tomando como referencia la foto del producto del alumno
-// POST { id, slot } con el JWT del alumno: rehace solo esa foto (máx. 3 veces por landing).
+// POST { id, slot } con el JWT del alumno: rehace solo esa foto.
+// Puntos de IA: crear la landing y rehacer una foto descuentan puntos de la bolsa mensual del alumno
+// (función spend_points). Si la IA falla, los puntos se devuelven.
 // POST { phase: "shared" }: crea la escena de entrega compartida solo si todavía no existe.
 // Los sellos, franjas y la lista de beneficios se dibujan después en el navegador del alumno.
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -19,9 +21,6 @@ const TEXT_MODELS = [Deno.env.get("GEMINI_MODEL"), "gemini-flash-latest", "gemin
 const IMAGE_MODELS = [Deno.env.get("GEMINI_IMAGE_MODEL"), "gemini-3.1-flash-image-preview", "gemini-2.5-flash-image"].filter(Boolean) as string[];
 const NANO_2 = "gemini-3.1-flash-image-preview";
 const NANO_ECO = "gemini-2.5-flash-image";
-// Costo aproximado de una landing (3 fotos + texto) en USD, según el modelo de las fotos con personas.
-const LANDING_COST: Record<string, number> = { [NANO_2]: 0.15, [NANO_ECO]: 0.1 };
-const MAX_REDOS = 3;
 const BUCKET = "makedrop";
 const SLOTS = ["despues", "usos", "antes"] as const;
 const SHARED_DELIVERY = "_shared/entrega.png";
@@ -320,10 +319,28 @@ function fromBase64(b64: string) {
 const adminClient = () => createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
 async function fail(id: string, e: unknown) {
-  await adminClient()
+  const admin = adminClient();
+  await admin
     .from("ai_landings")
     .update({ status: "error", result: null, error: String((e as Error)?.message ?? e).slice(0, 1000), finished_at: new Date().toISOString() })
     .eq("id", id);
+  // La landing no salió: se devuelven los puntos.
+  await admin.from("ai_points_usage").delete().eq("ref_id", id).eq("action", "landing");
+}
+
+/** Descuenta puntos. Devuelve el id del gasto, o null si no le alcanzan. */
+async function spend(userId: string, action: string, points: number, ref: string) {
+  const { data, error } = await adminClient().rpc("spend_points", { p_user: userId, p_action: action, p_points: points, p_ref: ref });
+  if (error) {
+    if (/sin_puntos/.test(error.message)) return null;
+    throw new Error(error.message);
+  }
+  return data as number;
+}
+
+async function pointsCost() {
+  const { data } = await adminClient().from("settings").select("points_landing, points_redo").eq("id", 1).maybeSingle();
+  return { landing: Number(data?.points_landing ?? 270), redo: Number(data?.points_redo ?? 80) };
 }
 
 async function loadPhotos(row: Row) {
@@ -498,25 +515,29 @@ Deno.serve(async (req) => {
   const { data: row } = await userClient.from("ai_landings").select("id, user_id, status, result").eq("id", id).maybeSingle();
   if (!row || row.user_id !== user.id) return json({ error: "No encontrado" }, 404);
 
-  // Rehacer solo una foto (máx. MAX_REDOS por landing): se responde cuando la foto está lista.
+  // Rehacer solo una foto (cuesta puntos): se responde cuando la foto está lista.
   if (slot) {
     if (!SLOTS.includes(slot)) return json({ error: "Esa foto no se puede rehacer" }, 400);
     if (row.status !== "listo" || !row.result?.titulo) return json({ error: "La landing aún no está lista" }, 409);
-    const redos = Number(row.result?.rehechas ?? 0);
-    if (redos >= MAX_REDOS) return json({ error: `Ya rehiciste ${MAX_REDOS} fotos en esta landing.` }, 429);
     const admin = adminClient();
     const { data: prof } = await admin.from("profiles").select("active").eq("id", user.id).single();
     if (!prof?.active) return json({ error: "Cuenta inactiva" }, 403);
+    const cost = (await pointsCost()).redo;
+    const usageId = await spend(user.id, "rehacer_foto", cost, id);
+    if (usageId === null) return json({ error: `No te alcanzan los puntos: rehacer una foto cuesta ${cost}.` }, 402);
     const { data: full } = await admin.from("ai_landings").select("*").eq("id", id).single();
     try {
       const refs = (await loadPhotos(full as Row)).slice(0, 2);
       const saved = await makeSlotImage(full as Row, slot as Slot, full.result, refs, await peopleModel());
       await admin
         .from("ai_landings")
-        .update({ images: { ...(full.images ?? {}), [slot]: saved.path }, result: { ...full.result, rehechas: redos + 1 } })
+        .update({ images: { ...(full.images ?? {}), [slot]: saved.path }, result: { ...full.result, rehechas: Number(full.result?.rehechas ?? 0) + 1 } })
         .eq("id", id);
-      return json({ ok: true, path: saved.path, left: MAX_REDOS - redos - 1 });
+      const { data: bal } = await admin.rpc("points_balance", { p_user: user.id });
+      const balance = (Array.isArray(bal) ? bal[0] : bal)?.balance ?? null;
+      return json({ ok: true, path: saved.path, balance });
     } catch (e) {
+      await admin.from("ai_points_usage").delete().eq("id", usageId); // no salió: se devuelven los puntos
       return json({ error: String((e as Error)?.message ?? e).slice(0, 300) }, 502);
     }
   }
@@ -529,38 +550,24 @@ Deno.serve(async (req) => {
   if (profile.role === "kit" && profile.access_until && new Date(profile.access_until).getTime() <= Date.now()) {
     return json({ error: "Acceso vencido" }, 403);
   }
-  if (profile.role !== "admin" && profile.role !== "coach") {
-    // Límite (Ajustes): fijo por mes, o el % de lo que paga el alumno dividido por el costo de cada landing.
-    const { data: settings } = await admin
-      .from("settings")
-      .select("landing_limit_mode, landing_monthly_kit, landing_monthly_member, landing_budget_pct, landing_image_model, landing_default_usd_kit, landing_default_usd_member")
-      .eq("id", 1)
-      .maybeSingle();
-    let limit: number;
-    if ((settings?.landing_limit_mode ?? "fijo") === "fijo") {
-      limit = Number(profile.role === "kit" ? settings?.landing_monthly_kit ?? 5 : settings?.landing_monthly_member ?? 20);
-    } else {
-      const { data: billing } = await admin.from("member_billing").select("monthly_usd").eq("user_id", user.id).maybeSingle();
-      const usd = Number(billing?.monthly_usd ?? (profile.role === "kit" ? settings?.landing_default_usd_kit : settings?.landing_default_usd_member) ?? 14);
-      const cost = LANDING_COST[settings?.landing_image_model ?? ""] ?? 0.15;
-      limit = Math.floor((usd * Number(settings?.landing_budget_pct ?? 3)) / 100 / cost + 1e-9);
-    }
-    const since = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
-    const { count } = await admin.from("ai_landings").select("id", { count: "exact", head: true }).eq("user_id", user.id).gte("created_at", since);
-    if ((count ?? 0) > limit) {
-      await admin.from("ai_landings").update({ status: "error", error: `Llegaste al límite de ${limit} landings en 30 días.` }).eq("id", id);
-      return json({ error: "Límite mensual" }, 429);
-    }
-  }
-
+  // Se toma la fila primero (para no cobrar dos veces si llegan 2 llamadas) y luego se cobran los puntos.
   const { data: queued } = await admin
     .from("ai_landings")
-    .update({ result: { _stage: "texto_pendiente" } })
+    .update({ result: { _stage: "en_cola" } })
     .eq("id", id)
     .is("result", null)
     .select("id")
     .maybeSingle();
   if (!queued) return json({ ok: true, status: "procesando" });
+
+  // Puntos de IA: crear la landing descuenta los puntos de Ajustes (admin y coaches no tienen límite).
+  const cost = (await pointsCost()).landing;
+  const usageId = await spend(user.id, "landing", cost, id);
+  if (usageId === null) {
+    await admin.from("ai_landings").update({ status: "error", result: null, error: `No te alcanzan los puntos: crear una landing cuesta ${cost}.` }).eq("id", id);
+    return json({ error: "Sin puntos" }, 402);
+  }
+  await admin.from("ai_landings").update({ result: { _stage: "texto_pendiente" } }).eq("id", id);
   // @ts-ignore EdgeRuntime existe en Supabase
   EdgeRuntime.waitUntil(phaseText(id, selfUrl));
   return json({ ok: true, status: "procesando" }, 202);

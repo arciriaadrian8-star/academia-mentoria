@@ -33,11 +33,11 @@ export type StudioProps = {
   deliveryUrl: string | null;
   /** Reseñas reales que pegó el alumno (una por línea). */
   reviews: string | null;
-  /** Cuántas fotos ya se rehicieron en esta landing (máx. 3). */
-  redosUsed: number;
+  /** Puntos que cuesta rehacer una foto y puntos que le quedan al alumno este mes (null = sin límite). */
+  redoCost: number;
+  pointsBalance: number | null;
 };
 
-const MAX_REDOS = 3;
 const REDO_SLOTS: Partial<Record<number, AiSlot>> = { 1: "despues", 4: "antes", 5: "usos" };
 
 const FONTS: Fonts = { display: "Anton, Impact, sans-serif", body: "Montserrat, Arial, sans-serif" };
@@ -76,7 +76,8 @@ export function LandingStudio(props: StudioProps) {
   const bitmaps = useRef<{ ai: Partial<Record<AiSlot, ImageBitmap>>; photos: ImageBitmap[]; delivery: ImageBitmap | null } | null>(null);
   const [version, setVersion] = useState(0);
   const [redoing, setRedoing] = useState<AiSlot | null>(null);
-  const [redosLeft, setRedosLeft] = useState(Math.max(MAX_REDOS - props.redosUsed, 0));
+  const [balance, setBalance] = useState<number | null>(props.pointsBalance);
+  const canRedo = balance === null || balance >= props.redoCost;
 
   // Dibuja las 8 imágenes finales (y las vuelve a dibujar si cambias el estilo, el color o la franja).
   useEffect(() => {
@@ -144,7 +145,7 @@ export function LandingStudio(props: StudioProps) {
       const { data: signed } = await supabase.storage.from(LANDING_BUCKET).createSignedUrl(data.path, 3600);
       if (!signed?.signedUrl || !bitmaps.current) throw new Error("No se pudo cargar la foto nueva");
       bitmaps.current.ai[slot] = await loadBitmap(signed.signedUrl);
-      setRedosLeft(typeof data.left === "number" ? data.left : redosLeft - 1);
+      setBalance(typeof data.balance === "number" ? data.balance : balance === null ? null : balance - props.redoCost);
       setVersion((v) => v + 1);
     } catch (e) {
       setError(`No se pudo rehacer la foto: ${(e as Error).message}`);
@@ -272,9 +273,9 @@ export function LandingStudio(props: StudioProps) {
                       <button
                         type="button"
                         onClick={() => redo(slot)}
-                        disabled={redoing !== null || redosLeft === 0 || !ready}
+                        disabled={redoing !== null || !canRedo || !ready}
                         className="w-full rounded-md border border-zinc-200 px-1 py-0.5 text-[10px] font-semibold text-zinc-600 hover:border-brand disabled:opacity-40"
-                        title={redosLeft === 0 ? "Ya rehiciste 3 fotos en esta landing" : "Rehacer solo esta foto"}
+                        title={canRedo ? `Rehacer solo esta foto (${props.redoCost} puntos)` : "No te alcanzan los puntos este mes"}
                       >
                         Rehacer
                       </button>
@@ -284,7 +285,8 @@ export function LandingStudio(props: StudioProps) {
               })}
             </div>
             <p className="mt-1 text-[11px] text-zinc-500">
-              ¿Una foto no quedó bien? Pulsa «Rehacer» debajo de ella. Te quedan {redosLeft} de {MAX_REDOS}.
+              ¿Una foto no quedó bien? Pulsa «Rehacer» debajo de ella ({props.redoCost} puntos).
+              {balance !== null && ` Te quedan ${balance} puntos este mes.`}
             </p>
           </div>
           <div>

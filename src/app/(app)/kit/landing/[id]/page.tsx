@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Trash2 } from "lucide-react";
-import { requireKit } from "@/lib/auth";
+import { getSettings, requireKit } from "@/lib/auth";
 import { createAdminClient, hasAdminKey } from "@/lib/supabase/admin";
-import { LANDING_BUCKET, type LandingResult } from "@/lib/landing";
+import { getPointsBalance, LANDING_BUCKET, type LandingResult } from "@/lib/landing";
 import { ConfirmButton } from "@/components/ConfirmButton";
 import { PageHeader } from "@/components/PageHeader";
 import { deleteLanding } from "../actions";
@@ -69,6 +69,7 @@ export default async function LandingResultPage({ params }: { params: Promise<{ 
   const urlOf = (path: string) => signed?.find((s) => s.path === path)?.signedUrl ?? "";
 
   // Escena de entrega compartida (imagen «Confianza»): está fuera de la carpeta del alumno, la firma el servidor.
+  const [settings, points] = await Promise.all([getSettings(), getPointsBalance(supabase, row.user_id)]);
   const delivery = hasAdminKey() ? await createAdminClient().storage.from(LANDING_BUCKET).createSignedUrl("_shared/entrega.png", 3600) : null;
 
   const studio: StudioProps = {
@@ -86,7 +87,8 @@ export default async function LandingResultPage({ params }: { params: Promise<{ 
     gifUrl: row.gif_path ? urlOf(row.gif_path) || null : null,
     deliveryUrl: delivery?.data?.signedUrl ?? null,
     reviews: row.reviews ?? null,
-    redosUsed: Number(row.result?.rehechas ?? 0),
+    redoCost: settings.points_redo,
+    pointsBalance: points.balance,
   };
 
   return (

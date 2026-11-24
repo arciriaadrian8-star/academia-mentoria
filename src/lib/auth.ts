@@ -65,13 +65,11 @@ const DEFAULT_SETTINGS: Settings = {
   welcome_message: null,
   allow_signup: true,
   auto_approve: false,
-  landing_limit_mode: "fijo",
-  landing_monthly_kit: 5,
-  landing_monthly_member: 20,
-  landing_budget_pct: 3,
   landing_image_model: "gemini-3.1-flash-image-preview",
-  landing_default_usd_kit: 14,
-  landing_default_usd_member: 14,
+  points_monthly_kit: 1000,
+  points_monthly_member: 1000,
+  points_landing: 270,
+  points_redo: 80,
 };
 
 export const getSettings = cache(async (): Promise<Settings> => {

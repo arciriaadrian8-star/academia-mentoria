@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, CalendarPlus, Trash2 } from "lucide-react";
 import { getSettings, requireAdmin } from "@/lib/auth";
-import { landingAllowance } from "@/lib/landing";
+import { getPointsBalance } from "@/lib/landing";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { toDateInput } from "@/lib/accessCodes";
 import { ROLE_DESCRIPTIONS, ROLE_LABELS } from "@/lib/constants";
@@ -34,9 +34,10 @@ export default async function MemberPage({
     supabase.from("lessons").select("id, course_id").eq("published", true),
     supabase.from("lesson_progress").select("lesson_id, completed_at").eq("user_id", id).order("completed_at", { ascending: false }),
     supabase.from("course_access").select("course_id, access_level_id"),
-    supabase.from("member_billing").select("monthly_usd").eq("user_id", id).maybeSingle(),
+    supabase.from("member_billing").select("monthly_points").eq("user_id", id).maybeSingle(),
     getSettings(),
   ]);
+  const points = await getPointsBalance(supabase, id);
   const member = profileRes.data as Profile | null;
   if (!member) notFound();
   const levels = (levelsRes.data ?? []) as AccessLevel[];
@@ -106,25 +107,20 @@ export default async function MemberPage({
             <p className="mt-1 text-xs text-zinc-500">Vacío = sin vencimiento. Al canjear un código nuevo se suman sus días.</p>
           </div>
           <div>
-            <label className="label" htmlFor="monthly_usd">Pago mensual (USD)</label>
+            <label className="label" htmlFor="monthly_points">Puntos de IA al mes</label>
             <input
-              id="monthly_usd"
-              name="monthly_usd"
+              id="monthly_points"
+              name="monthly_points"
               type="number"
               min={0}
-              step="0.01"
-              defaultValue={billingRes.data?.monthly_usd ?? ""}
-              placeholder={`Por defecto: ${member.role === "kit" ? settings.landing_default_usd_kit : settings.landing_default_usd_member}`}
+              defaultValue={billingRes.data?.monthly_points ?? ""}
+              placeholder={`Por defecto: ${member.role === "kit" ? settings.points_monthly_kit : settings.points_monthly_member}`}
               className="input"
             />
             <p className="mt-1 text-xs text-zinc-500">
-              {(() => {
-                const a = landingAllowance(member.role, billingRes.data?.monthly_usd, settings);
-                if (a.limit === null) return "Admin y coaches no tienen límite de landings.";
-                return settings.landing_limit_mode === "porcentaje"
-                  ? `Con el ${settings.landing_budget_pct} % de su pago puede crear ${a.limit} landing${a.limit === 1 ? "" : "s"} con IA cada 30 días.`
-                  : `Límite fijo (Ajustes): ${a.limit} landing${a.limit === 1 ? "" : "s"} con IA cada 30 días. El pago solo cuenta en el modo porcentaje.`;
-              })()}
+              {points.allowance === null
+                ? "Admin y coaches no gastan puntos."
+                : `Este mes lleva ${points.used} de ${points.allowance} puntos; le quedan ${points.balance}. Vacío = los puntos por defecto de Ajustes.`}
             </p>
           </div>
           <div>

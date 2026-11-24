@@ -4,13 +4,13 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getSettings, requireKit } from "@/lib/auth";
 import { COUNTRIES } from "@/lib/kit";
-import { AUDIENCES, isHexColor, LANDING_BUCKET, landingAllowance } from "@/lib/landing";
+import { AUDIENCES, getPointsBalance, isHexColor, LANDING_BUCKET } from "@/lib/landing";
 import { str, strOrNull } from "@/lib/utils";
 
 export type LandingState = { error?: string } | null;
 
 export async function createLanding(_prev: LandingState, formData: FormData): Promise<LandingState> {
-  const { supabase, user, profile } = await requireKit();
+  const { supabase, user } = await requireKit();
   const description = str(formData, "description");
   // El nombre es opcional: si no lo escribe, usamos el comienzo de la descripción.
   const product = str(formData, "product") || description.split(/[.,\n]/)[0].slice(0, 60).trim();
@@ -24,15 +24,11 @@ export async function createLanding(_prev: LandingState, formData: FormData): Pr
   if (!price) return { error: "Escribe el precio de venta." };
   if (photos.length === 0) return { error: "Sube al menos una foto del producto." };
 
-  const { data: billing } = await supabase.from("member_billing").select("monthly_usd").eq("user_id", user.id).maybeSingle();
-  const { limit } = landingAllowance(profile.role, billing?.monthly_usd, await getSettings());
-  if (limit !== null) {
-    const since = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
-    const { count } = await supabase.from("ai_landings").select("id", { count: "exact", head: true }).eq("user_id", user.id).gte("created_at", since);
-    if ((count ?? 0) >= limit) {
-      await cleanup();
-      return { error: limit === 0 ? "Tu plan todavía no alcanza para landings con IA. Escríbele a tu mentor." : `Llegaste al límite de ${limit} landings en 30 días.` };
-    }
+  // Puntos de IA: crear una landing cuesta lo que diga Ajustes (por defecto 270).
+  const [settings, points] = await Promise.all([getSettings(), getPointsBalance(supabase, user.id)]);
+  if (points.balance !== null && points.balance < settings.points_landing) {
+    await cleanup();
+    return { error: `No te alcanzan los puntos: crear una landing cuesta ${settings.points_landing} y te quedan ${points.balance}. Se recargan el 1 del próximo mes.` };
   }
 
   const country = COUNTRIES.includes(str(formData, "country") as (typeof COUNTRIES)[number]) ? str(formData, "country") : "Colombia";

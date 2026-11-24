@@ -24,13 +24,11 @@ export async function updateSettings(formData: FormData) {
       welcome_message: strOrNull(formData, "welcome_message"),
       allow_signup: formData.get("allow_signup") === "on",
       auto_approve: formData.get("auto_approve") === "on",
-      landing_limit_mode: str(formData, "landing_limit_mode") === "porcentaje" ? "porcentaje" : "fijo",
-      landing_monthly_kit: Math.round(clampNum(str(formData, "landing_monthly_kit"), 0, 100, 5)),
-      landing_monthly_member: Math.round(clampNum(str(formData, "landing_monthly_member"), 0, 500, 20)),
-      landing_budget_pct: clampNum(str(formData, "landing_budget_pct"), 0, 100, 3),
       landing_image_model: IMAGE_MODELS.some((m) => m.id === str(formData, "landing_image_model")) ? str(formData, "landing_image_model") : IMAGE_MODELS[0].id,
-      landing_default_usd_kit: clampNum(str(formData, "landing_default_usd_kit"), 0, 100000, 14),
-      landing_default_usd_member: clampNum(str(formData, "landing_default_usd_member"), 0, 100000, 14),
+      points_monthly_kit: Math.round(clampNum(str(formData, "points_monthly_kit"), 0, 1000000, 1000)),
+      points_monthly_member: Math.round(clampNum(str(formData, "points_monthly_member"), 0, 1000000, 1000)),
+      points_landing: Math.round(clampNum(str(formData, "points_landing"), 0, 100000, 270)),
+      points_redo: Math.round(clampNum(str(formData, "points_redo"), 0, 100000, 80)),
     })
     .eq("id", 1);
   if (error) throw error;

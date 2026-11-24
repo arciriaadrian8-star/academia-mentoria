@@ -84,10 +84,10 @@ export async function updateMember(formData: FormData) {
   const { error } = await admin.from("profiles").update(update).eq("id", id);
   if (error) throw error;
   await setLevels(id, formData.getAll("levels").map(String));
-  // Pago mensual (USD) para calcular su presupuesto de IA. Vacío = usar el pago por defecto.
-  const usd = parseFloat(str(formData, "monthly_usd").replace(",", "."));
-  if (Number.isFinite(usd) && usd >= 0) {
-    await admin.from("member_billing").upsert({ user_id: id, monthly_usd: Math.min(Math.round(usd * 100) / 100, 100000), updated_at: new Date().toISOString() });
+  // Puntos de IA al mes para este alumno. Vacío = los de Ajustes según su tipo.
+  const points = parseInt(str(formData, "monthly_points"), 10);
+  if (Number.isFinite(points) && points >= 0) {
+    await admin.from("member_billing").upsert({ user_id: id, monthly_points: Math.min(points, 1000000), updated_at: new Date().toISOString() });
   } else {
     await admin.from("member_billing").delete().eq("user_id", id);
   }

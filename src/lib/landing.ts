@@ -12,31 +12,18 @@ export const IMAGE_MODELS = [
 export const landingCost = (model: string) => IMAGE_MODELS.find((m) => m.id === model)?.costUsd ?? IMAGE_MODELS[0].costUsd;
 export const landingCostCop = (model: string) => IMAGE_MODELS.find((m) => m.id === model)?.costCop ?? IMAGE_MODELS[0].costCop;
 
-type BudgetSettings = {
-  landing_limit_mode: string;
-  landing_monthly_kit: number;
-  landing_monthly_member: number;
-  landing_budget_pct: number;
-  landing_image_model: string;
-  landing_default_usd_kit: number;
-  landing_default_usd_member: number;
-};
+/** Bolsa de puntos del mes (null = sin límite: admin y coaches). Viene de la función points_balance de la base de datos. */
+export type PointsBalance = { allowance: number | null; used: number; balance: number | null };
 
-/**
- * Cuántas landings puede crear un alumno cada 30 días. Modo «fijo»: un número por tipo de alumno
- * (academia = rol kit, mentoría 1 a 1 = rol member). Modo «porcentaje»: el % de lo que paga al mes
- * dividido por lo que cuesta cada landing. Admin y coaches no tienen límite (limit = null).
- */
-export function landingAllowance(role: string, monthlyUsd: number | null | undefined, s: BudgetSettings) {
-  const cost = landingCost(s.landing_image_model);
-  if (role === "admin" || role === "coach") return { limit: null, monthlyUsd: null, budget: null, cost };
-  if (s.landing_limit_mode !== "porcentaje") {
-    return { limit: Number(role === "kit" ? s.landing_monthly_kit : s.landing_monthly_member) || 0, monthlyUsd: null, budget: null, cost };
-  }
-  const usd = Number(monthlyUsd ?? (role === "kit" ? s.landing_default_usd_kit : s.landing_default_usd_member)) || 0;
-  const budget = (usd * Number(s.landing_budget_pct)) / 100;
-  return { limit: Math.floor(budget / cost + 1e-9), monthlyUsd: usd, budget, cost };
+export async function getPointsBalance(
+  supabase: { rpc: (fn: string, args: Record<string, unknown>) => PromiseLike<{ data: unknown; error: unknown }> },
+  userId: string,
+): Promise<PointsBalance> {
+  const { data } = await supabase.rpc("points_balance", { p_user: userId });
+  const row = (Array.isArray(data) ? data[0] : data) as PointsBalance | undefined;
+  return row ?? { allowance: 0, used: 0, balance: 0 };
 }
+
 export const LANDING_BUCKET = "makedrop";
 
 export const AUDIENCES = ["Mujeres", "Hombres", "Mujeres y hombres", "Mamás y papás", "Niños", "Adultos mayores", "Mascotas y sus dueños"] as const;

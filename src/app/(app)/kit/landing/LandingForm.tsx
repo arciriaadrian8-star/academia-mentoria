@@ -4,7 +4,7 @@ import { startTransition, useActionState, useEffect, useState } from "react";
 import { Check, ImagePlus, Loader2, Sparkles, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { COUNTRIES, loadLocal, saveLocal } from "@/lib/kit";
-import { AUDIENCES, BRAND_COLORS, DEFAULT_COLOR, descriptionPrompt, LANDING_BUCKET } from "@/lib/landing";
+import { AUDIENCES, BRAND_COLORS, DEFAULT_COLOR, descriptionPrompt, LANDING_BUCKET, type PointsBalance } from "@/lib/landing";
 import { CopyButton } from "@/components/CopyButton";
 import { FormMessage } from "@/components/FormMessage";
 import { createLanding, type LandingState } from "./actions";
@@ -60,7 +60,7 @@ async function suggestColor(file: File): Promise<string | null> {
   }
 }
 
-export function LandingForm({ userId, used, limit }: { userId: string; used: number; limit: number | null }) {
+export function LandingForm({ userId, points, cost }: { userId: string; points: PointsBalance; cost: number }) {
   const [state, action, pending] = useActionState<LandingState, FormData>(createLanding, null);
   const [photos, setPhotos] = useState<{ file: File; preview: string }[]>([]);
   const [gif, setGif] = useState<File | null>(null);
@@ -135,12 +135,19 @@ export function LandingForm({ userId, used, limit }: { userId: string; used: num
   }
 
   const busy = uploading || pending;
-  const left = limit === null ? null : Math.max(limit - used, 0);
+  const canAfford = points.balance === null || points.balance >= cost;
   const swatches = [...new Set([...(fromPhoto ? [fromPhoto] : []), ...BRAND_COLORS])];
 
   return (
     <form onSubmit={onSubmit} className="card space-y-4 p-5">
-      <h2 className="flex items-center gap-2 font-semibold"><Sparkles className="size-4 text-brand" /> Nueva landing</h2>
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="flex items-center gap-2 font-semibold"><Sparkles className="size-4 text-brand" /> Nueva landing</h2>
+        {points.balance !== null && (
+          <span className="chip bg-brand/10 text-brand" title="Puntos de IA de este mes">
+            {points.balance} pts
+          </span>
+        )}
+      </div>
 
       {/* 1. Foto */}
       <div>
@@ -289,12 +296,15 @@ export function LandingForm({ userId, used, limit }: { userId: string; used: num
       </details>
 
       <FormMessage error={localError || state?.error} />
-      <button type="submit" disabled={busy || left === 0} className="btn btn-primary w-full">
+      <button type="submit" disabled={busy || !canAfford} className="btn btn-primary w-full">
         {busy && <Loader2 className="size-4 animate-spin" />}
-        {uploading ? "Subiendo fotos..." : pending ? "Enviando a la IA..." : "Crear mi landing"}
+        {uploading ? "Subiendo fotos..." : pending ? "Enviando a la IA..." : `Crear mi landing · ${cost} puntos`}
       </button>
       <p className="text-xs text-zinc-500">
-        Tarda entre 1 y 2 minutos.{limit !== null && ` Te quedan ${left} de ${limit} landings en estos 30 días.`}
+        Tarda entre 1 y 2 minutos.
+        {points.balance === null
+          ? " Tú no gastas puntos."
+          : ` Te quedan ${points.balance} de ${points.allowance} puntos este mes${canAfford ? "" : " (no te alcanza; se recargan el día 1)"}.`}
       </p>
     </form>
   );

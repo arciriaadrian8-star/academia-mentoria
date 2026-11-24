@@ -9,11 +9,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { zipSync } from "fflate";
 import { AlertTriangle, Download, FileSpreadsheet, Loader2, Palette, Store } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { buildDescriptionHtml, buildShopifyCsv, DEFAULT_COLOR, FINAL_IMAGES, fileName, isHexColor, LANDING_BUCKET, type LandingResult } from "@/lib/landing";
+import { buildDescriptionHtml, buildShopifyCsv, DEFAULT_COLOR, discountPct, FINAL_IMAGES, fileName, imageTexts, isHexColor, LANDING_BUCKET, parseReviews, type LandingResult } from "@/lib/landing";
 import { CopyButton } from "@/components/CopyButton";
-import { composeImage, composeTrust, inkFor, loadBitmap, type Brand, type Fonts } from "./compose";
+import { composeImage, inkFor, loadBitmap, type Brand, type Fonts, type Look } from "./compose";
 
-type AiSlot = "principal" | "beneficios" | "uso_1" | "producto" | "uso_2";
+/** Fotos de IA: «despues», «usos» (2×2) y «antes». Las de landings viejas se reaprovechan. */
+type AiSlot = "despues" | "usos" | "antes" | "principal" | "uso_1" | "uso_2" | "producto" | "beneficios";
 
 export type StudioProps = {
   landingId: string;
@@ -28,12 +29,16 @@ export type StudioProps = {
   aiUrls: Partial<Record<AiSlot, string>>;
   photoUrls: string[];
   gifUrl: string | null;
+  /** Escena de entrega compartida para la imagen «Confianza». */
+  deliveryUrl: string | null;
+  /** Reseñas reales que pegó el alumno (una por línea). */
+  reviews: string | null;
   /** Cuántas fotos ya se rehicieron en esta landing (máx. 3). */
   redosUsed: number;
 };
 
 const MAX_REDOS = 3;
-const REDO_SLOTS: Partial<Record<number, AiSlot>> = { 1: "principal", 3: "uso_1", 4: "producto" };
+const REDO_SLOTS: Partial<Record<number, AiSlot>> = { 3: "antes", 5: "usos", 8: "despues" };
 
 const FONTS: Fonts = { display: "Anton, Impact, sans-serif", body: "Montserrat, Arial, sans-serif" };
 
@@ -53,23 +58,27 @@ h1{font-size:22px;line-height:1.25;margin:28px 0 10px}h2{font-size:21px;margin:3
 
 export function LandingStudio(props: StudioProps) {
   const { result: r, code } = props;
+  const reviews = useMemo(() => parseReviews(props.reviews), [props.reviews]);
+  // «Reseñas» solo se arma si hay reseñas reales.
+  const images = useMemo(() => FINAL_IMAGES.filter((im) => im.kind !== "resenas" || reviews.length > 0), [reviews]);
   const [brand, setBrand] = useState<Brand>(() => ({
     color: isHexColor(props.color) ? props.color : DEFAULT_COLOR,
     storeName: props.storeName || "Mi Tienda",
     freeShipping: !props.offer || /gratis/i.test(props.offer),
     cod: true,
+    look: "ganador",
   }));
   const [finals, setFinals] = useState<Record<number, { blob: Blob; url: string }>>({});
   const [composing, setComposing] = useState(true);
   const [busy, setBusy] = useState<"" | "csv" | "zip">("");
   const [error, setError] = useState("");
   const [frameHeight, setFrameHeight] = useState(1600);
-  const bitmaps = useRef<{ ai: Partial<Record<AiSlot, ImageBitmap>>; photos: ImageBitmap[] } | null>(null);
+  const bitmaps = useRef<{ ai: Partial<Record<AiSlot, ImageBitmap>>; photos: ImageBitmap[]; delivery: ImageBitmap | null } | null>(null);
   const [version, setVersion] = useState(0);
   const [redoing, setRedoing] = useState<AiSlot | null>(null);
   const [redosLeft, setRedosLeft] = useState(Math.max(MAX_REDOS - props.redosUsed, 0));
 
-  // Dibuja las 6 imágenes finales (y las vuelve a dibujar si cambias color, tienda o franja).
+  // Dibuja las 8 imágenes finales (y las vuelve a dibujar si cambias el estilo, el color o la franja).
   useEffect(() => {
     let cancelled = false;
     const t = setTimeout(async () => {
@@ -85,34 +94,23 @@ export function LandingStudio(props: StudioProps) {
             }),
           );
           const photos = (await Promise.all(props.photoUrls.map((u) => loadBitmap(u).catch(() => null)))).filter(Boolean) as ImageBitmap[];
-          bitmaps.current = { ai, photos };
+          const delivery = props.deliveryUrl ? await loadBitmap(props.deliveryUrl).catch(() => null) : null;
+          bitmaps.current = { ai, photos, delivery };
         }
-        const { ai, photos } = bitmaps.current;
+        const { ai, photos, delivery } = bitmaps.current;
+        const pics = {
+          despues: ai.despues ?? ai.principal ?? ai.uso_1 ?? null,
+          usos: ai.usos ?? null,
+          antes: ai.antes ?? null,
+          photo: photos[0] ?? null,
+          delivery,
+        };
+        const texts = imageTexts(r);
+        const prices = { price: props.price, compare: props.comparePrice, discountPct: discountPct(props.price, props.comparePrice) };
         const next: Record<number, { blob: Blob; url: string }> = {};
-        for (const [i, im] of FINAL_IMAGES.entries()) {
-          const blob =
-            im.slot === "confianza"
-              ? await composeTrust(brand, FONTS)
-              : await composeImage(
-                  {
-                    slot: im.slot,
-                    // Beneficios: si la landing es de las nuevas (3 fotos), se arma con la foto premium del producto.
-                    // Imagen 5: la foto real del alumno (en landings viejas, su foto de IA).
-                    ai: im.slot === "beneficios" ? ai.beneficios ?? null : im.slot === "uso_2" ? ai.uso_2 ?? null : ai[im.slot] ?? null,
-                    photo:
-                      im.slot === "beneficios"
-                        ? ai.producto ?? photos[0] ?? null
-                        : im.slot === "uso_2"
-                          ? photos[0] ?? null
-                          : photos.length
-                            ? photos[i % photos.length]
-                            : null,
-                    recuadro: r.recuadro,
-                    beneficios: r.beneficios_imagen,
-                  },
-                  brand,
-                  FONTS,
-                );
+        const extra = { beneficios: r.beneficios_imagen ?? [], reviews };
+        for (const im of images) {
+          const blob = await composeImage(im.kind, texts, pics, prices, brand, FONTS, extra);
           next[im.n] = { blob, url: URL.createObjectURL(blob) };
         }
         if (cancelled) return;
@@ -130,7 +128,7 @@ export function LandingStudio(props: StudioProps) {
       cancelled = true;
       clearTimeout(t);
     };
-  }, [brand, props.aiUrls, props.photoUrls, r.recuadro, r.beneficios_imagen, version]);
+  }, [brand, props.aiUrls, props.photoUrls, props.deliveryUrl, props.price, props.comparePrice, r, version, images, reviews]);
 
   /** Rehace solo una foto con IA (sin gastar una landing nueva). */
   async function redo(slot: AiSlot) {
@@ -157,21 +155,21 @@ export function LandingStudio(props: StudioProps) {
 
   const hasGif = Boolean(props.gifUrl);
   const shopifyHtml = useMemo(
-    () => buildDescriptionHtml(r, (n) => `/cdn/shop/files/${fileName(code, n)}`, { hasGif, color: brand.color }),
+    () => buildDescriptionHtml(r, (n) => `/cdn/shop/files/${fileName(code, n)}`, { hasGif, hasReviews: reviews.length > 0, color: brand.color }),
     [r, code, hasGif, brand.color],
   );
   const previewHtml = useMemo(
-    () => buildDescriptionHtml(r, (n) => (n === "gif" ? props.gifUrl ?? "" : finals[n]?.url ?? ""), { hasGif, color: brand.color }),
+    () => buildDescriptionHtml(r, (n) => (n === "gif" ? props.gifUrl ?? "" : finals[n]?.url ?? ""), { hasGif, hasReviews: reviews.length > 0, color: brand.color }),
     [r, finals, hasGif, props.gifUrl, brand.color],
   );
-  const ready = Object.keys(finals).length === FINAL_IMAGES.length && !composing;
+  const ready = Object.keys(finals).length === images.length && !composing;
 
   /** Sube las imágenes finales con su nombre definitivo y devuelve enlaces temporales (7 días) para que Shopify las descargue. */
   async function uploadFinals() {
     const supabase = createClient();
     const base = `${props.userId}/${props.landingId}`;
     const items: { path: string; alt: string }[] = [];
-    for (const im of FINAL_IMAGES) {
+    for (const im of images) {
       const path = `${base}/${fileName(code, im.n)}`;
       const { error: upErr } = await supabase.storage.from(LANDING_BUCKET).upload(path, finals[im.n].blob, { contentType: "image/jpeg", upsert: true });
       if (upErr) throw new Error(upErr.message);
@@ -220,7 +218,7 @@ export function LandingStudio(props: StudioProps) {
     setError("");
     try {
       const files: Record<string, Uint8Array> = {};
-      for (const im of FINAL_IMAGES) files[fileName(code, im.n)] = new Uint8Array(await finals[im.n].blob.arrayBuffer());
+      for (const im of images) files[fileName(code, im.n)] = new Uint8Array(await finals[im.n].blob.arrayBuffer());
       if (props.gifUrl) files[fileName(code, "gif")] = new Uint8Array(await (await fetch(props.gifUrl)).arrayBuffer());
       const enc = new TextEncoder();
       files["descripcion-shopify.html"] = enc.encode(shopifyHtml);
@@ -252,8 +250,8 @@ export function LandingStudio(props: StudioProps) {
                 <div className="flex size-full items-center justify-center"><Loader2 className="size-8 animate-spin text-zinc-400" /></div>
               )}
             </div>
-            <div className="mt-2 grid grid-cols-6 gap-1.5">
-              {FINAL_IMAGES.map((im) => {
+            <div className="mt-2 grid grid-cols-5 gap-1.5">
+              {images.map((im) => {
                 const slot = REDO_SLOTS[im.n];
                 return (
                   <div key={im.n} className="space-y-1">
@@ -350,9 +348,28 @@ export function LandingStudio(props: StudioProps) {
             <label className="label" htmlFor="md-store">Nombre de tu tienda</label>
             <input id="md-store" className="input" maxLength={40} value={brand.storeName} onChange={(e) => setBrand({ ...brand, storeName: e.target.value })} />
           </div>
+          <div>
+            <span className="label">Estilo de las imágenes</span>
+            <div className="grid grid-cols-2 gap-2">
+              {([
+                { id: "ganador", label: "Amarillo y rojo", hint: "El ganador" },
+                { id: "marca", label: "Mi color", hint: "Color de tu tienda" },
+              ] as { id: Look; label: string; hint: string }[]).map((o) => (
+                <button
+                  key={o.id}
+                  type="button"
+                  onClick={() => setBrand({ ...brand, look: o.id })}
+                  className={`rounded-xl border p-2 text-left text-sm ${brand.look === o.id ? "border-brand bg-brand/5 font-semibold" : "border-zinc-200"}`}
+                >
+                  {o.label}
+                  <span className="block text-xs font-normal text-zinc-500">{o.hint}</span>
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="flex items-center gap-3">
-            <input type="color" aria-label="Color de los sellos" value={brand.color} onChange={(e) => setBrand({ ...brand, color: e.target.value })} className="h-10 w-14 cursor-pointer rounded-lg border border-zinc-200" />
-            <span className="text-sm text-zinc-600">Color de tu página (sellos, franjas y detalles)</span>
+            <input type="color" aria-label="Color de tu tienda" value={brand.color} onChange={(e) => setBrand({ ...brand, color: e.target.value })} className="h-10 w-14 cursor-pointer rounded-lg border border-zinc-200" />
+            <span className="text-sm text-zinc-600">Color de tu tienda (estilo «Mi color» y detalles de la descripción)</span>
           </div>
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={brand.freeShipping} onChange={(e) => setBrand({ ...brand, freeShipping: e.target.checked })} /> Envío gratis

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Trash2 } from "lucide-react";
 import { requireKit } from "@/lib/auth";
+import { createAdminClient, hasAdminKey } from "@/lib/supabase/admin";
 import { LANDING_BUCKET, type LandingResult } from "@/lib/landing";
 import { ConfirmButton } from "@/components/ConfirmButton";
 import { PageHeader } from "@/components/PageHeader";
@@ -67,6 +68,9 @@ export default async function LandingResultPage({ params }: { params: Promise<{ 
   const { data: signed } = paths.length ? await supabase.storage.from(LANDING_BUCKET).createSignedUrls(paths, 3600) : { data: [] };
   const urlOf = (path: string) => signed?.find((s) => s.path === path)?.signedUrl ?? "";
 
+  // Escena de entrega compartida (imagen «Confianza»): está fuera de la carpeta del alumno, la firma el servidor.
+  const delivery = hasAdminKey() ? await createAdminClient().storage.from(LANDING_BUCKET).createSignedUrl("_shared/entrega.png", 3600) : null;
+
   const studio: StudioProps = {
     landingId: row.id,
     userId: row.user_id,
@@ -80,6 +84,8 @@ export default async function LandingResultPage({ params }: { params: Promise<{ 
     aiUrls: Object.fromEntries(Object.entries(images).map(([slot, path]) => [slot, urlOf(path)]).filter(([, u]) => u)),
     photoUrls: photoPaths.map(urlOf).filter(Boolean),
     gifUrl: row.gif_path ? urlOf(row.gif_path) || null : null,
+    deliveryUrl: delivery?.data?.signedUrl ?? null,
+    reviews: row.reviews ?? null,
     redosUsed: Number(row.result?.rehechas ?? 0),
   };
 

@@ -122,3 +122,11 @@ Las imágenes VENDEN SOLAS: cada una tiene un titular grande y el precio. La des
 **La página:** barra "Envío GRATIS + Paga al Recibir" · gancho en pregunta ("¿Diciembre y la casa sin pintar?") · estrellas · precio −50 % · "Llega en 2 a 5 días" · botón con beneficio ("QUIERO PINTAR MI CASA") · bloque de confianza (pagas al recibir, confirmamos por WhatsApp, garantía, derecho de retracto Ley 1480) · reseñas con fotos (app) · secciones título + imagen + 1 frase · tabla "Rodillo y brocha vs Pistola" · "¿Qué va a pintar?" · precio + botón · cómo se usa (3 pasos) · "Antes de pedir" (avisos honestos) · 4 preguntas frecuentes · botón final.
 
 **Cómo lo hace el agente sin gastar más (~COP 575):** 3 llamadas de IA → (1) persona feliz con el producto, (2) cuadrícula 2×2 de usos en UNA sola imagen, (3) escena del problema para el ANTES. Las franjas, titulares, precio, sellos, etiquetas, paneles ✗/✓ e íconos se dibujan con código. Producto y "qué le llega" con la foto del alumno. Confianza con una escena de entrega genérica hecha una sola vez y reutilizada.
+
+## 6. Galería combinada (la que usa el agente)
+
+Marco Pidelisto en todas (titular arriba, nombre + precio abajo, amarillo/rojo o el color del alumno), adaptado al producto por la IA:
+
+1. Oferta (sello de descuento + precio antes) · 2. Beneficios (infografía con ✓ estilo LullaBites) · 3. Antes / Después · 4. Qué le llega · 5. Usos 2×2 · 6. Comparación ✗/✓ · 7. Reseñas en comentarios (solo con reseñas REALES que pegue el alumno; iniciales, sin fotos inventadas) · 8. Aspiracional · 9. Confianza (repartidor compartido + 4 íconos) · 10. Producto limpio.
+
+3 fotos de IA por landing (después y usos en Nano Banana 2, antes en el económico) ≈ COP 575. Todo lo demás se dibuja con código.

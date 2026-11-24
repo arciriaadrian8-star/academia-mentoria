@@ -1,11 +1,15 @@
 // MakeDrop Landing: genera con Gemini el texto completo de una landing para Shopify
-// (estructura definitiva + preguntas frecuentes) y 3 fotos con IA (máx. ~COP 575 por landing):
-//   2 con personas en Nano Banana 2 (calidad máxima) + 1 del producto solo en Nano Banana (económico).
-//   La infografía de beneficios, la foto real del alumno y «Compra verificada» se arman con código.
+// (estructura definitiva + preguntas frecuentes) y 3 fotos con IA (máx. ~COP 575 por landing) para las
+// 7 imágenes vendedoras estilo Pidelisto (titular arriba, precio abajo):
+//   «despues» (persona feliz con el producto) y «usos» (cuadrícula 2×2 en UNA imagen) en Nano Banana 2,
+//   «antes» (el problema, sin el producto) en Nano Banana económico.
+//   Franjas, titulares, precio, sellos, ANTES/DESPUÉS, ✗/✓ e íconos se dibujan con código en el navegador.
+//   La escena de entrega de «Confianza» se genera UNA sola vez y la comparten todas las landings.
 // POST { id } con el JWT del alumno. Responde 202 y sigue en segundo plano en 2 fases:
 //   "text"   → escribe todos los textos y las escenas de cada foto
 //   "images" → genera las 3 fotos tomando como referencia la foto del producto del alumno
 // POST { id, slot } con el JWT del alumno: rehace solo esa foto (máx. 3 veces por landing).
+// POST { phase: "shared" }: crea la escena de entrega compartida solo si todavía no existe.
 // Los sellos, franjas y la lista de beneficios se dibujan después en el navegador del alumno.
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -19,7 +23,8 @@ const NANO_ECO = "gemini-2.5-flash-image";
 const LANDING_COST: Record<string, number> = { [NANO_2]: 0.15, [NANO_ECO]: 0.1 };
 const MAX_REDOS = 3;
 const BUCKET = "makedrop";
-const SLOTS = ["principal", "uso_1", "producto"] as const;
+const SLOTS = ["despues", "usos", "antes"] as const;
+const SHARED_DELIVERY = "_shared/entrega.png";
 type Slot = (typeof SLOTS)[number];
 
 const cors = {
@@ -74,11 +79,31 @@ const SCHEMA = {
     persona: str,
     escenas: {
       type: "object",
-      properties: { principal: str, uso_1: str, producto: str },
-      required: ["principal", "uso_1", "producto"],
+      properties: { despues: str, usos: str, antes: str },
+      required: ["despues", "usos", "antes"],
+    },
+    imagenes: {
+      type: "object",
+      properties: {
+        nombre_corto: str,
+        titulares: {
+          type: "object",
+          properties: { oferta: str, antes_despues: str, que_llega: str, usos: str, comparacion: str, aspiracional: str, confianza: str },
+          required: ["oferta", "antes_despues", "que_llega", "usos", "comparacion", "aspiracional", "confianza"],
+        },
+        aspiracional_sub: str,
+        usos_etiquetas: { type: "array", items: str },
+        que_llega_items: { type: "array", items: str },
+        comparacion: {
+          type: "object",
+          properties: { sin_titulo: str, sin_texto: str, con_titulo: str, con_texto: str },
+          required: ["sin_titulo", "sin_texto", "con_titulo", "con_texto"],
+        },
+      },
+      required: ["nombre_corto", "titulares", "aspiracional_sub", "usos_etiquetas", "que_llega_items", "comparacion"],
     },
   },
-  required: ["titulo", "nombre_marca", "barra_anuncio", "recuadro", "beneficios_imagen", "bloques", "faq", "seo", "tipo_producto", "etiquetas", "producto_visual", "persona", "escenas"],
+  required: ["titulo", "nombre_marca", "barra_anuncio", "recuadro", "beneficios_imagen", "bloques", "faq", "seo", "tipo_producto", "etiquetas", "producto_visual", "persona", "escenas", "imagenes"],
 };
 
 type Row = Record<string, unknown> & {
@@ -127,14 +152,28 @@ ESTRUCTURA OBLIGATORIA (la landing va en la descripción del producto de Shopify
 7. "faq": título con emoji (ej: "❓ Preguntas frecuentes ❓") y EXACTAMENTE 4 preguntas cortas: 2 con las dudas reales del producto (cómo se usa, si sirve para mí, tallas/medidas, qué incluye…) y 2 de compra: cómo pago (contra entrega, al recibir) y cuánto tarda en llegar (envío a todo ${r.country}). Respuestas cortas y tranquilizadoras.
 8. "seo": título (máx 60 caracteres) y descripción (máx 155) para Google.
 9. "tipo_producto": categoría corta (ej: "Bienestar"). "etiquetas": 5 etiquetas.
+10. "imagenes" (textos que van ESCRITOS en las 7 imágenes vendedoras; cortos, directos, hablándole de "usted" como en Colombia, sin signos de exclamación):
+   - nombre_corto: nombre del producto para la franja de precio, máx. 22 caracteres (ej: "PISTOLA DE PINTURA").
+   - titulares (máx. 32 caracteres cada uno, irán en MAYÚSCULAS):
+     oferta: el beneficio principal (ej: "Pinte su casa sin pagar pintor").
+     antes_despues: el resultado (ej: "Así queda su casa para diciembre").
+     que_llega: "Esto le llega a su casa" o similar.
+     usos: todo lo que puede hacer con él (ej: "Pinte todo usted mismo").
+     comparacion: el ahorro o la ventaja frente a la alternativa (ej: "Deje de pagarle al pintor").
+     aspiracional: la vida soñada con el producto; si aplica, la temporada actual (ej: "La casa lista para la Navidad").
+     confianza: "Paga cuando lo tenga en sus manos".
+   - aspiracional_sub: subtítulo corto para la imagen aspiracional (máx. 40 caracteres).
+   - usos_etiquetas: EXACTAMENTE 4 usos distintos, máx. 18 caracteres, en mayúsculas cuando se muestren (ej: "Pinta paredes", "Pinta rejas", "Pinta puertas", "Pinta muebles").
+   - que_llega_items: 3 o 4 cosas que trae la caja, solo las de la descripción o la foto (ej: "Vaso de 800 ml").
+   - comparacion: sin_titulo (la alternativa, máx. 22: "Pagarle al pintor"), sin_texto (su problema, máx. 30: "Le cobra el día"), con_titulo (máx. 22: "Con su pistola"), con_texto (la ventaja, máx. 30: "Lo hace usted en una tarde").
 
 PARA LAS FOTOS (en INGLÉS, las usa un generador de imágenes)
 - "producto_visual": descripción precisa del aspecto del producto (forma, colores, empaque, etiqueta, tamaño) para que salga idéntico.
 - "persona": el cliente ideal que aparece en las fotos (edad, género, rasgos latinos, ropa) — debe ser coherente en todas.
 - "escenas": una escena por foto, en inglés, 1-2 frases, sin texto en la imagen:
-   principal: the person smiling at the camera and holding the product close to their chest with both hands (arms bent, not extended), simple warm studio background.
-   uso_1: the person using/enjoying the product in a real everyday moment of their life (where the problem happens).
-   producto: premium hero shot of the product alone on a dark elegant background with dramatic light.
+   despues: the AFTER / dream result: the person happy and proud in the place where the problem is now solved, holding or using the product (if a season fits, add it subtly, e.g. Christmas decoration in December).
+   usos: a 2x2 grid of FOUR different photos in one image, one per item of usos_etiquetas, in the same order (top-left, top-right, bottom-left, bottom-right), each showing a person using the product for that use.
+   antes: the BEFORE / the problem: the same kind of place with the problem clearly visible (dirty, broken, messy, uncomfortable…), WITHOUT the product, a bit gloomy.
 
 REGLAS
 - Español latino natural de ${r.country}, frases cortas, tono de amigo, emojis con moderación (solo en títulos y viñetas).
@@ -145,25 +184,27 @@ Responde SOLO con el JSON del esquema.`;
 }
 
 const SLOT_SPEC: Record<Slot, string> = {
-  principal: "Medium shot from the waist up. The person is placed slightly to the LEFT and LOWER in the frame: the head must be below the top 35% of the image and away from the right side. The entire TOP-RIGHT quarter of the image must be plain, empty background (a text box will cover it). The product is held close to the chest, clearly visible, at its real size.",
-  uso_1: "Candid lifestyle photo, natural light, the product clearly visible and recognizable.",
-  producto: "Product centered, large, filling about 60% of the frame, premium studio look.",
+  despues: "Square photo. Person in the center, face in the middle third of the image (not at the very top or bottom), the product clearly visible at its real size. Bright, warm, happy.",
+  usos: "4:3 image made of a clean 2x2 grid of four equal photos separated by thin white lines. Each panel: one person using the product for one use, product clearly visible at its real size, faces in the middle of each panel.",
+  antes: "Square photo of the problem situation, no product anywhere, slightly dull and gloomy light, the problem obvious at first sight.",
 };
+const SLOT_RATIO: Record<Slot, string> = { despues: "1:1", usos: "4:3", antes: "1:1" };
 
 function imagePrompt(slot: Slot, result: Record<string, unknown>, hasPhotos: boolean) {
   const escenas = (result.escenas ?? {}) as Record<string, string>;
-  const peopleSlot = slot === "principal" || slot === "uso_1";
+  const peopleSlot = slot === "despues" || slot === "usos";
   return [
     "Ultra realistic commercial advertising photograph for a Latin American e-commerce product page. Square 1:1 image.",
     `Scene: ${escenas[slot] ?? ""}`,
     peopleSlot ? `Person: ${result.persona ?? "a Latin American adult"}. Natural skin texture, genuine expression, realistic hands.` : "",
     `Composition: ${SLOT_SPEC[slot]}`,
     `Product: ${result.producto_visual ?? ""}.`,
-    hasPhotos
+    hasPhotos && slot !== "antes"
       ? "CRITICAL: the product must look EXACTLY like the product in the attached reference photo(s): same shape, colors, packaging, label design and proportions. Do not redesign it."
       : "",
+    slot === "antes" ? "The product must NOT appear in this image." : "",
     "REAL SCALE: keep the product at its true real-world size relative to hands, faces and objects (for example, a supplement bottle fits in one hand). Never enlarge it or bring it close to the lens.",
-    "Keep the top-left corner, the top-right corner and the bottom 20% of the frame visually simple, without faces or the product, because graphics will be placed there later.",
+    "Leave a little breathing room at the top and bottom edges (they may be cropped).",
     "Do NOT add any text, letters, numbers, logos, watermarks, stickers, price tags, badges or graphic overlays. Professional lighting, sharp focus, vibrant but natural colors.",
   ]
     .filter(Boolean)
@@ -218,13 +259,13 @@ class ImageError extends Error {
   }
 }
 
-async function generateImage(prompt: string, refs: Part[], models: string[]) {
+async function generateImage(prompt: string, refs: Part[], models: string[], ratio = "1:1") {
   let lastError = "";
   for (const model of models) {
     for (let attempt = 0; attempt < 2; attempt++) {
       const body = (withConfig: boolean) => ({
         contents: [{ role: "user", parts: [...refs, { text: prompt }] }],
-        generationConfig: withConfig ? { responseModalities: ["IMAGE"], imageConfig: { aspectRatio: "1:1" } } : { responseModalities: ["TEXT", "IMAGE"] },
+        generationConfig: withConfig ? { responseModalities: ["IMAGE"], imageConfig: { aspectRatio: ratio } } : { responseModalities: ["TEXT", "IMAGE"] },
       });
       let res = await gemini(`/v1beta/models/${model}:generateContent`, body(true));
       if (res.status === 400) res = await gemini(`/v1beta/models/${model}:generateContent`, body(false));
@@ -345,14 +386,14 @@ async function peopleModel() {
   return (cfg?.landing_image_model as string | undefined) || NANO_2;
 }
 
-/** Fotos con personas: el modelo de calidad primero. Producto solo: el económico primero (casi no se nota la diferencia). */
+/** Fotos con personas: el modelo de calidad primero. La escena del problema: el económico primero. */
 function modelsFor(slot: Slot, preferred: string) {
-  const first = slot === "producto" ? NANO_ECO : preferred;
+  const first = slot === "antes" ? NANO_ECO : preferred;
   return [first, ...IMAGE_MODELS.filter((m) => m !== first)];
 }
 
 async function makeSlotImage(row: Row, slot: Slot, result: Record<string, unknown>, refs: Part[], preferred: string) {
-  const img = await generateImage(imagePrompt(slot, result, refs.length > 0), refs, modelsFor(slot, preferred));
+  const img = await generateImage(imagePrompt(slot, result, refs.length > 0), refs, modelsFor(slot, preferred), SLOT_RATIO[slot]);
   const ext = img.mime.includes("jpeg") ? "jpg" : img.mime.includes("webp") ? "webp" : "png";
   const path = `${row.user_id}/${row.id}/base-${slot}.${ext}`;
   const { error } = await adminClient().storage.from(BUCKET).upload(path, fromBase64(img.data), { contentType: img.mime, upsert: true });
@@ -378,7 +419,7 @@ async function phaseImages(id: string) {
       SLOTS.map(async (slot) => {
         try {
           const saved = await makeSlotImage(row, slot, result, refs, preferred);
-          if (slot !== "producto") imageModel = saved.model;
+          if (slot !== "antes") imageModel = saved.model;
           images[slot] = saved.path;
         } catch (e) {
           if (e instanceof ImageError && e.billing) billing = true;
@@ -410,11 +451,29 @@ async function phaseImages(id: string) {
   }
 }
 
+async function ensureSharedDelivery() {
+  const admin = adminClient();
+  const { data: list } = await admin.storage.from(BUCKET).list("_shared", { search: "entrega.png" });
+  if (list?.some((f) => f.name === "entrega.png")) return { ok: true, existed: true };
+  const prompt = [
+    "Ultra realistic commercial advertising photograph, square 1:1.",
+    "A friendly Latin American delivery man in a beige uniform and cap hands a medium cardboard box to a smiling Latin American woman at the door of a nice colorful house with plants, sunny day.",
+    "The two people are on the LEFT 60% of the image; the RIGHT 40% is a clean, slightly blurred house wall (graphics will go there). Faces in the upper-middle area. Leave the bottom 30% simple (icons will cover it).",
+    "Do NOT add any text, letters, logos or watermarks.",
+  ].join("\n");
+  const img = await generateImage(prompt, [], [NANO_2, NANO_ECO], "1:1");
+  const { error } = await admin.storage.from(BUCKET).upload(SHARED_DELIVERY, fromBase64(img.data), { contentType: img.mime, upsert: false });
+  if (error && !/exists/i.test(error.message)) return { ok: false, error: error.message };
+  return { ok: true, created: true };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "Método no permitido" }, 405);
 
   const { id, phase, slot } = await req.json().catch(() => ({}));
+  // Escena de entrega compartida (imagen «Confianza»): solo se crea si todavía no existe.
+  if (phase === "shared") return json(await ensureSharedDelivery());
   if (!id || typeof id !== "string") return json({ error: "Falta el id" }, 400);
   const selfUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/makedrop-landing`;
 

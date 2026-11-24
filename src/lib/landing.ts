@@ -63,18 +63,83 @@ export type LandingResult = {
   etiquetas: string[];
   resenas_reales?: boolean;
   aviso_imagenes?: string | null;
+  imagenes?: ImageTexts;
 };
 
-/** Las 6 imágenes finales (en este orden en la galería de Shopify) + el GIF opcional. */
+/**
+ * Las imágenes finales, en el orden de la galería de Shopify. Combina las estructuras ganadoras:
+ * marco Pidelisto (titular arriba, precio abajo) + infografía de beneficios + antes/después + reseñas.
+ * «Reseñas» solo sale si el alumno pegó reseñas reales de sus clientes.
+ */
 export const FINAL_IMAGES = [
-  { n: 1, slot: "principal", label: "Principal" },
-  { n: 2, slot: "beneficios", label: "Beneficios" },
-  { n: 3, slot: "uso_1", label: "En uso" },
-  { n: 4, slot: "producto", label: "Producto" },
-  { n: 5, slot: "uso_2", label: "Producto real" },
-  { n: 6, slot: "confianza", label: "Compra verificada" },
+  { n: 1, kind: "oferta", label: "Oferta" },
+  { n: 2, kind: "beneficios", label: "Beneficios" },
+  { n: 3, kind: "antes_despues", label: "Antes y después" },
+  { n: 4, kind: "que_llega", label: "Qué le llega" },
+  { n: 5, kind: "usos", label: "Usos" },
+  { n: 6, kind: "comparacion", label: "Comparación" },
+  { n: 7, kind: "resenas", label: "Reseñas" },
+  { n: 8, kind: "aspiracional", label: "Aspiracional" },
+  { n: 9, kind: "confianza", label: "Confianza" },
+  { n: 10, kind: "producto", label: "Producto" },
 ] as const;
-export type FinalSlot = (typeof FINAL_IMAGES)[number]["slot"];
+
+export type Review = { nombre: string; ciudad: string; texto: string };
+
+/** Lee las reseñas reales que pegó el alumno: una por línea, «Nombre, Ciudad: texto» (nombre y ciudad opcionales). */
+export function parseReviews(raw: string | null | undefined): Review[] {
+  return (raw ?? "")
+    .split(/\n+/)
+    .map((l) => l.trim())
+    .filter((l) => l.length > 3)
+    .slice(0, 4)
+    .map((l) => {
+      const m = l.match(/^([^:]{2,60}):\s*(.+)$/);
+      if (!m) return { nombre: "Cliente", ciudad: "", texto: l.slice(0, 220) };
+      const [nombre, ciudad = ""] = m[1].split(",").map((x) => x.trim());
+      return { nombre: nombre.slice(0, 30) || "Cliente", ciudad: ciudad.slice(0, 30), texto: m[2].slice(0, 220) };
+    });
+}
+export type FinalKind = (typeof FINAL_IMAGES)[number]["kind"];
+
+export type ImageTexts = {
+  nombre_corto: string;
+  titulares: { oferta: string; antes_despues: string; que_llega: string; usos: string; comparacion: string; aspiracional: string; confianza: string };
+  aspiracional_sub: string;
+  usos_etiquetas: string[];
+  que_llega_items: string[];
+  comparacion: { sin_titulo: string; sin_texto: string; con_titulo: string; con_texto: string };
+};
+
+/** Textos de las imágenes; para landings viejas (sin «imagenes») se arman con lo que ya hay. */
+export function imageTexts(r: LandingResult): ImageTexts {
+  if (r.imagenes) return r.imagenes;
+  const name = (r.nombre_marca || r.titulo).replace(/™/g, "").slice(0, 22);
+  return {
+    nombre_corto: name,
+    titulares: {
+      oferta: r.recuadro?.linea2?.slice(0, 40) || name,
+      antes_despues: "Así cambia su día",
+      que_llega: "Esto le llega a su casa",
+      usos: "Úselo todos los días",
+      comparacion: "La diferencia se nota",
+      aspiracional: r.bloques.habito.titulo.slice(0, 40),
+      confianza: "Paga cuando lo tenga en sus manos",
+    },
+    aspiracional_sub: r.bloques.cierre.llamado.slice(0, 40),
+    usos_etiquetas: (r.beneficios_imagen ?? []).slice(0, 4).map((b) => b.split(" ").slice(0, 3).join(" ")),
+    que_llega_items: [r.nombre_marca, ...(r.bloques.formula.beneficios ?? []).map((b) => b.nombre)].slice(0, 4),
+    comparacion: { sin_titulo: "Sin el producto", sin_texto: "El problema sigue", con_titulo: `Con ${name}`.slice(0, 22), con_texto: "Problema resuelto" },
+  };
+}
+
+/** % de descuento entre el precio de hoy y el de antes (para el sello de la imagen de oferta). */
+export function discountPct(price: string, compare: string | null) {
+  const now = Number(toShopifyPrice(price));
+  const before = Number(toShopifyPrice(compare));
+  if (!now || !before || before <= now) return null;
+  return Math.round((1 - now / before) * 100);
+}
 
 export const fileName = (code: string, n: number | "gif") => (n === "gif" ? `md-${code}-gif.gif` : `md-${code}-${n}.jpg`);
 
@@ -115,20 +180,23 @@ function readable(hex: string) {
  * Todo centrado y sencillo, como la landing de referencia. `src(n)` devuelve la URL de cada imagen
  * (en Shopify, la ruta del archivo importado; en la vista previa, la imagen local).
  */
-export function buildDescriptionHtml(r: LandingResult, src: (n: number | "gif") => string, opts: { hasGif: boolean; color?: string | null }) {
+export function buildDescriptionHtml(r: LandingResult, src: (n: number | "gif") => string, opts: { hasGif: boolean; hasReviews?: boolean; color?: string | null }) {
   const b = r.bloques;
   const accent = readable(isHexColor(opts.color) ? opts.color : DEFAULT_COLOR);
   const out: string[] = [];
+  // Imágenes: 3 antes/después · 4 qué llega · 2 beneficios · 8 aspiracional · 6 comparación · 5 usos · 9 confianza · 7 reseñas
   out.push(h1(b.dolor.emoji, b.dolor.titulo), p(b.dolor.texto), img(src(opts.hasGif ? "gif" : 3), r.nombre_marca));
-  out.push(h1(b.promesa.emoji, b.promesa.titulo), p(b.promesa.texto), img(src(4), r.nombre_marca));
+  if (opts.hasGif) out.push(img(src(3), `Antes y después con ${r.nombre_marca}`));
+  out.push(h1(b.promesa.emoji, b.promesa.titulo), p(b.promesa.texto), img(src(4), `Qué incluye ${r.nombre_marca}`));
   out.push(h1(b.formula.emoji, b.formula.titulo));
   for (const x of b.formula.beneficios.slice(0, 3)) out.push(`<p ${C}>➡️ <strong>${esc(x.nombre)}:</strong> ${esc(x.texto)}</p>`);
   out.push(img(src(2), `Beneficios de ${r.nombre_marca}`));
-  out.push(h1(b.habito.emoji, b.habito.titulo), p(b.habito.texto), img(src(5), r.nombre_marca));
+  out.push(h1(b.habito.emoji, b.habito.titulo), p(b.habito.texto), img(src(8), r.nombre_marca), img(src(6), `${r.nombre_marca} frente a la alternativa`));
   out.push(h1(b.uso.emoji, b.uso.titulo));
   b.uso.pasos.slice(0, 3).forEach((paso, i) => out.push(p(`${["1️⃣", "2️⃣", "3️⃣"][i]} ${paso}`)));
-  out.push(img(src(opts.hasGif ? 3 : 1), r.nombre_marca));
-  out.push(h1(b.cierre.emoji, b.cierre.titulo), p(b.cierre.texto), `<p ${C}><strong style="color: ${accent};">${esc(b.cierre.llamado)}</strong></p>`, img(src(6), "Compra verificada"));
+  out.push(img(src(5), `Usos de ${r.nombre_marca}`));
+  out.push(h1(b.cierre.emoji, b.cierre.titulo), p(b.cierre.texto), `<p ${C}><strong style="color: ${accent};">${esc(b.cierre.llamado)}</strong></p>`, img(src(9), "Paga al recibir"));
+  if (opts.hasReviews) out.push(img(src(7), "Lo que dicen nuestros clientes"));
 
   // Las reseñas no van aquí: los alumnos las ponen con su app de reseñas (Judge.me, Loox, etc.).
 

@@ -8,8 +8,8 @@ const STEPS = [
   "La IA está mirando las fotos de tu producto…",
   "Escribiendo tu título ganador…",
   "Escribiendo la descripción y las preguntas frecuentes…",
-  "Creando las fotos de tu producto con IA…",
-  "Dando los últimos toques a tus imágenes…",
+  "Creando las fotos de antes, después y usos con IA…",
+  "Armando tus imágenes vendedoras…",
 ];
 
 export function AutoRefresh({ since }: { since: string }) {

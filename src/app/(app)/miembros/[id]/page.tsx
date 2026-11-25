@@ -37,6 +37,8 @@ export default async function MemberPage({
     supabase.from("member_billing").select("monthly_points").eq("user_id", id).maybeSingle(),
     getSettings(),
   ]);
+  const { data: enrollments } = await supabase
+    .from("student_enrollments").select("id, program, plan_name, platform, paid_until, status").eq("user_id", id);
   const points = await getPointsBalance(supabase, id);
   const member = profileRes.data as Profile | null;
   if (!member) notFound();
@@ -167,6 +169,27 @@ export default async function MemberPage({
             {progress[0] && (
               <p className="mt-4 text-xs text-zinc-500">
                 Última lección completada: {new Date(progress[0].completed_at).toLocaleDateString("es", { day: "numeric", month: "long" })}
+              </p>
+            )}
+          </section>
+
+          <section className="card p-6">
+            <h2 className="mb-3 font-semibold">Programa y pagos</h2>
+            {enrollments && enrollments.length > 0 ? (
+              <ul className="space-y-2 text-sm">
+                {enrollments.map((en) => (
+                  <li key={en.id}>
+                    <Link href={`/miembros/alumnos/${en.id}`} className="font-semibold text-brand hover:underline">
+                      {en.plan_name || (en.program === "acompanamiento" ? "Acompañamiento" : "Membresía")}
+                    </Link>
+                    <span className="text-zinc-500"> · {en.platform} · {en.status}{en.paid_until && ` · pagado hasta ${en.paid_until.split("-").reverse().join("/")}`}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-zinc-500">
+                No está en el control de alumnos.{" "}
+                <Link href="/miembros/alumnos/nuevo" className="text-brand underline">Agregarlo</Link> con el correo {member.email} y se liga solo.
               </p>
             )}
           </section>

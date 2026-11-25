@@ -106,6 +106,38 @@ Puedes reordenar módulos y lecciones con las flechas ↑ ↓ y guardar leccione
 
 ![Calendario](docs/calendario.png)
 
+### Control de alumnos (acompañamiento y membresías)
+
+**Miembros → Control de alumnos** reúne a todos tus alumnos, sin importar por dónde pagaron:
+
+| Plataforma | Cobro | Qué hace la academia |
+|---|---|---|
+| **Nequi** y **Wompi** (enlace de pago) | Manual: les cobras tú | Les manda el recordatorio, te lista a quién cobrar y registras el pago con un clic («Pagó»). |
+| **Whop** y **Skool** | Automático | Te avisa cuando su fecha ya pasó para que verifiques en Whop/Skool que el cobro entró («Ya renovó») o le avises que falló. |
+
+- **Agregar o importar**: uno por uno o todos de una vez, pegando las columnas desde Excel/Google Sheets (*nombre, correo, WhatsApp, programa, plataforma, valor, moneda, pagado hasta*). Si el correo coincide con una cuenta de la academia, se ligan solos, y al registrar un pago se le activa el acceso.
+- **Ficha del alumno**: historial de pagos, «queda al día hasta» calculado solo (mantiene su fecha de corte), seguimiento del acompañamiento (sesiones hechas de las incluidas y notas) y botón para quitar o devolver el acceso.
+- **Meta de renovación**: barra con el % de alumnos que renovaron este mes, frente a la meta del **80 %**.
+- Base de datos: aplica `supabase/upgrade-14-control-alumnos.sql` y `supabase/upgrade-15-recordatorios-whatsapp.sql` en el SQL Editor.
+
+#### Recordatorios automáticos por WhatsApp (1 día antes del pago)
+
+A los alumnos de **pago manual** (Nequi, Wompi y otros) les llega un WhatsApp automático **1 día antes** de su fecha de pago (se puede cambiar en el panel), otro **el día del pago** y otro **a los 2 días** si todavía no han pagado. Sale todos los días a las 9 a.m. hora Colombia y nunca se repite el mismo aviso.
+
+Para que los mensajes salgan solos hace falta la **API oficial de WhatsApp Business** (Meta). WhatsApp no permite enviar mensajes automáticos desde un número normal ni desde WhatsApp Business de celular:
+
+1. En [business.facebook.com](https://business.facebook.com) crea una app de tipo *Business* con el producto **WhatsApp** y registra un número (puede ser uno nuevo; no puede seguir usándose en la app del celular).
+2. En **WhatsApp Manager → Plantillas** crea una plantilla de categoría *Utilidad*, idioma Español, por ejemplo `recordatorio_pago`, con este cuerpo:
+   > Hola {{1}} 👋 Te recuerdo que tu {{2}} se renueva el {{3}}. El valor es {{4}}. Puedes pagar por {{5}}. Cuando pagues, envíame el comprobante por aquí 🙌
+3. Crea un **token permanente** (usuario del sistema con permiso `whatsapp_business_messaging`).
+4. En Supabase → **Edge Functions → Secrets** agrega `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_ID`, `WHATSAPP_TEMPLATE` (`recordatorio_pago`) y, si la plantilla no es «es», `WHATSAPP_TEMPLATE_LANG` (ej.: `es_CO`). Opcional: `WHATSAPP_TEMPLATE_VENCIDO`, una plantilla aparte para los atrasados.
+5. Publica la función: `supabase functions deploy recordatorios-alumnos --no-verify-jwt`.
+6. Escribe tu número de Nequi y tu enlace de Wompi en **Control de alumnos → Datos de cobro**: van en la variable {{5}}.
+
+Meta cobra cada mensaje de plantilla de *Utilidad* (en Colombia son unos pocos centavos de dólar).
+
+**Skool** no tiene una forma de enviar mensajes automáticos, así que en la sección «Recordatorios: pagan mañana» cada alumno tiene **«Copiar para Skool»**: copias el mensaje y lo pegas en su chat de Skool. Mientras la API no esté configurada, el botón **WhatsApp** abre el chat con el mensaje ya escrito.
+
 ### Comunidad y marca
 - Publica anuncios en la categoría **📢 Anuncios** y fíjalos arriba (📌 Fijar).
 - En **Ajustes** cambia el nombre, el logo, el color principal y el mensaje de bienvenida.

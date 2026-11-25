@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { KeyRound, Layers, Plus, Search, Users, CreditCard } from "lucide-react";
+import { GraduationCap, KeyRound, Layers, Plus, Search, Users, CreditCard } from "lucide-react";
 import { isKitExpired, requireAdmin } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ROLE_LABELS } from "@/lib/constants";
@@ -36,6 +36,9 @@ export default async function MembersPage({ searchParams }: { searchParams: Prom
   return (
     <>
       <PageHeader title="Miembros" description="Da acceso a tus alumnos y decide qué contenido ve cada uno.">
+        <Link href="/miembros/alumnos" className="btn btn-primary">
+          <GraduationCap className="size-4" /> Control de alumnos
+        </Link>
         <Link href="/miembros/membresias" className="btn btn-secondary">
           <CreditCard className="size-4" /> Membresías Nequi
         </Link>
@@ -45,7 +48,7 @@ export default async function MembersPage({ searchParams }: { searchParams: Prom
         <Link href="/miembros/niveles" className="btn btn-secondary">
           <Layers className="size-4" /> Niveles de acceso
         </Link>
-        <Link href="/miembros/nuevo" className="btn btn-primary">
+        <Link href="/miembros/nuevo" className="btn btn-secondary">
           <Plus className="size-4" /> Nuevo miembro
         </Link>
       </PageHeader>

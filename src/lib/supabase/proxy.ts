@@ -37,7 +37,8 @@ export async function updateSession(request: NextRequest) {
   const isLoggedIn = Boolean(data?.claims);
 
   const path = request.nextUrl.pathname;
-  const isPublic = PUBLIC_PATHS.some((p) => path === p || path.startsWith(`${p}/`));
+  // «/» es la página pública de MakeDrop para quien no ha iniciado sesión.
+  const isPublic = path === "/" || PUBLIC_PATHS.some((p) => path === p || path.startsWith(`${p}/`));
 
   if (!isLoggedIn && !isPublic) {
     const url = request.nextUrl.clone();

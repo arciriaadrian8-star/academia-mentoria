@@ -15,6 +15,8 @@ export interface Profile {
   welcome_seen_at?: string | null;
   /** Cuentas «Solo Kit»: cuándo vence su acceso (null = sin vencimiento). */
   access_until?: string | null;
+  /** Lo que respondió al registrarse: «¿Eres miembro de la Academia?» (null = no se le preguntó). */
+  academy_member?: boolean | null;
 }
 
 export interface AccessLevel {

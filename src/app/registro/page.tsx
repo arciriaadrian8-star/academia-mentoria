@@ -6,7 +6,8 @@ import { AuthCard } from "../AuthCard";
 import { GoogleButton, OrDivider } from "../GoogleButton";
 import { RegisterForm } from "./RegisterForm";
 
-export default async function RegisterPage() {
+export default async function RegisterPage({ searchParams }: { searchParams: Promise<{ miembro?: string }> }) {
+  const { miembro } = await searchParams;
   const { user } = await getSession();
   if (user) redirect("/");
   const [settings, providers] = await Promise.all([getSettings(), getAuthProviders()]);
@@ -24,7 +25,7 @@ export default async function RegisterPage() {
     <AuthCard
       settings={settings}
       title="Crea tu cuenta"
-      subtitle={settings.auto_approve ? undefined : "Tu mentor revisará tu solicitud y te dará acceso."}
+      subtitle="Entra a MakeDrop IA: tu landing ganadora para Shopify en 40 segundos."
     >
       {providers.google && (
         <>
@@ -32,7 +33,7 @@ export default async function RegisterPage() {
           <OrDivider />
         </>
       )}
-      <RegisterForm />
+      <RegisterForm defaultMember={miembro === "si" || miembro === "no" ? miembro : undefined} />
       <p className="mt-5 text-center text-sm text-zinc-500">
         ¿Ya tienes cuenta?{" "}
         <Link href="/login" className="font-semibold text-brand hover:underline">Inicia sesión</Link>

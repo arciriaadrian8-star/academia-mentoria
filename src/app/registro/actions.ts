@@ -16,6 +16,8 @@ export async function register(
   if (!fullName || !email) return { error: "Escribe tu nombre y tu email." };
   if (password.length < 8) return { error: "La contraseña debe tener al menos 8 caracteres." };
   if (password !== str(formData, "confirm")) return { error: "Las contraseñas no coinciden." };
+  const academyMember = str(formData, "academy_member");
+  if (academyMember !== "si" && academyMember !== "no") return { error: "Cuéntanos si eres miembro de la Academia." };
 
   const settings = await getSettings();
   if (!settings.allow_signup) return { error: "El registro está cerrado. Pide acceso a tu mentor." };
@@ -25,7 +27,7 @@ export async function register(
     email,
     password,
     options: {
-      data: { full_name: fullName },
+      data: { full_name: fullName, academy_member: academyMember },
       emailRedirectTo: `${await getRequestOrigin()}/auth/confirm?next=/`,
     },
   });

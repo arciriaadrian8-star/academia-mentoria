@@ -27,6 +27,7 @@ export function PendingRequests({ requests, levels }: { requests: Profile[]; lev
                 <p className="truncate text-xs text-zinc-500">
                   {r.email} · {timeAgo(r.created_at)}
                 </p>
+                {r.academy_member && <span className="chip mt-1 bg-emerald-100 text-emerald-800">Dice que es miembro de la academia</span>}
               </div>
             </div>
             <form action={approveMember} className="flex flex-1 flex-wrap items-center gap-3">

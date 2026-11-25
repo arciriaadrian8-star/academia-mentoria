@@ -17,6 +17,17 @@ export const MAKEDROP = {
   whatsapp: "573208652165",
 } as const;
 
+const drive = (id: string) => `https://drive.google.com/thumbnail?id=${id}&sz=w1200`;
+
+/** Casos de éxito reales de estudiantes (capturas sin datos de clientes). Se muestran en /membresia y en la portada. */
+export const SUCCESS_CASES = [
+  { title: "Emilio", text: "Su proceso en la mentoría y el crecimiento de sus pedidos en Shopify, contado por él mismo.", img: drive("1T7XX9NOwyLvdfTudtxj1Zblf5cEtmK71") },
+  { title: "Jorge", text: "En octubre me escribió para celebrar la primera venta de su tienda.", img: null },
+  { title: "Fabián", text: "\"Cayó un pedido masivo\": así me escribió Fabián cuando le empezaron a entrar pedidos grandes.", img: drive("1FE55Ytjn-nSLgLNhqQi_dWCDi3FB3MXY") },
+  { title: "$2,2 millones COP en ventas", text: "Ventas totales de la tienda de un estudiante en Shopify.", img: drive("1Z2qtccIVputhpl11cMA3BA5Qst-YUxYl") },
+  { title: "Pedidos todos los días", text: "Lista de pedidos contra entrega de un estudiante.", img: drive("1mbhuYe04Xs4IwORgE0oL8tSsBgQwKFI6") },
+] as const;
+
 /** Enlace de WhatsApp con un mensaje ya escrito. */
 export function whatsappLink(number: string, text: string) {
   return `https://wa.me/${number}?text=${encodeURIComponent(text)}`;

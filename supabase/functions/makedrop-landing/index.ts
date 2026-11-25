@@ -1,9 +1,9 @@
 // MakeDrop Landing: genera con Gemini el texto completo de una landing para Shopify
-// (estructura definitiva + preguntas frecuentes) y 3 fotos con IA (máx. ~COP 575 por landing) para las
-// 7 imágenes vendedoras estilo Pidelisto (titular arriba, precio abajo):
-//   «despues» (persona feliz con el producto) y «usos» (cuadrícula 2×2 en UNA imagen) en Nano Banana 2,
-//   «antes» (el problema, sin el producto) en Nano Banana económico.
-//   Franjas, titulares, precio, sellos, ANTES/DESPUÉS, ✗/✓ e íconos se dibujan con código en el navegador.
+// (estructura definitiva + preguntas frecuentes) y hasta 3 fotos con IA para las
+// imágenes vendedoras (titular arriba, precio abajo):
+//   «despues» (persona feliz con el producto), «usos» (cuadrícula 2×2 en UNA imagen) y
+//   «antes» (el problema, sin el producto).
+//   Franjas, titulares, precio, sellos, ANTES/DESPUÉS, ✗/✓ e íconos se dibujan con código en el navegador (gratis).
 //   La escena de entrega de «Confianza» se genera UNA sola vez y la comparten todas las landings.
 // POST { id } con el JWT del alumno. Responde 202 y sigue en segundo plano en 2 fases:
 //   "text"   → escribe todos los textos y las escenas de cada foto
@@ -12,7 +12,10 @@
 // Puntos de IA: crear la landing y rehacer una foto descuentan puntos de la bolsa mensual del alumno
 // (función spend_points). Si la IA falla, los puntos se devuelven.
 // POST { phase: "shared" }: crea la escena de entrega compartida solo si todavía no existe.
-// Los sellos, franjas y la lista de beneficios se dibujan después en el navegador del alumno.
+// Tope de gasto (Ajustes → landing_max_cop, 500 por defecto): primero se escribe el texto y se mide su gasto real;
+// con lo que queda se hacen todas las fotos que quepan en el modelo económico y, si sobra, la del después
+// y la de usos suben a Nano Banana 2. Con 500: las 3 fotos en el económico (~COP 450).
+// Cada landing guarda su gasto real (result.costo), calculado con el conteo de tokens que devuelve Gemini.
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const GEMINI = "https://generativelanguage.googleapis.com";
@@ -25,6 +28,29 @@ const BUCKET = "makedrop";
 const SLOTS = ["despues", "usos", "antes"] as const;
 const SHARED_DELIVERY = "_shared/entrega.png";
 type Slot = (typeof SLOTS)[number];
+
+// Precios públicos de Gemini (USD por 1M de tokens) y dólar en pesos (algo por encima de la TRM, para no pasarse del tope).
+const COP_PER_USD = 3500;
+const PRICES: Record<string, { input: number; output: number }> = {
+  [NANO_2]: { input: 0.5, output: 60 },
+  [NANO_ECO]: { input: 0.3, output: 30 },
+  "gemini-flash-lite-latest": { input: 0.1, output: 0.4 },
+  "gemini-2.5-flash-lite": { input: 0.1, output: 0.4 },
+};
+const TEXT_PRICE = { input: 0.5, output: 3 }; // modelos flash de texto (el más caro de ellos)
+const THINK_PRICE = 3; // el razonamiento se cobra como texto de salida
+/** Gasto estimado de una foto antes de generarla (USD). */
+const PHOTO_USD: Record<string, number> = { [NANO_2]: 0.068, [NANO_ECO]: 0.04 };
+const TEXT_USD_EST = 0.015;
+
+type Usage = { promptTokenCount?: number; candidatesTokenCount?: number; thoughtsTokenCount?: number } | undefined;
+/** Gasto real de una llamada, con el conteo de tokens que devuelve Gemini. */
+function usageUsd(model: string, usage: Usage) {
+  const p = PRICES[model] ?? TEXT_PRICE;
+  const usd = (Number(usage?.promptTokenCount ?? 0) * p.input + Number(usage?.candidatesTokenCount ?? 0) * p.output + Number(usage?.thoughtsTokenCount ?? 0) * THINK_PRICE) / 1e6;
+  return usd || (PHOTO_USD[model] ?? 0);
+}
+const round4 = (n: number) => Math.round(n * 10000) / 10000;
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -245,7 +271,7 @@ async function generateText(parts: Part[]) {
       if (!res.ok) throw new Error(`Gemini respondió con error (${res.status}): ${JSON.stringify(data).slice(0, 300)}`);
       const text = data?.candidates?.[0]?.content?.parts?.map((p: { text?: string; thought?: boolean }) => (p.thought ? "" : p.text ?? "")).join("") ?? "";
       if (!text) throw new Error("La IA no devolvió respuesta (puede que la foto o la descripción hayan sido bloqueadas por las políticas de contenido).");
-      return { model, result: JSON.parse(text) as Record<string, unknown> };
+      return { model, result: JSON.parse(text) as Record<string, unknown>, usd: usageUsd(model, data?.usageMetadata) || TEXT_USD_EST };
     }
   }
   if (busy) throw new Error("La IA de Google está saturada en este momento. Intenta de nuevo en unos minutos.");
@@ -258,10 +284,12 @@ class ImageError extends Error {
   }
 }
 
+/** Genera una foto. Solo pasa a otro modelo si es más barato, para no salirse del tope de gasto. */
 async function generateImage(prompt: string, refs: Part[], models: string[], ratio = "1:1") {
   let lastError = "";
+  const attempts = models.length === 1 ? 3 : 2;
   for (const model of models) {
-    for (let attempt = 0; attempt < 2; attempt++) {
+    for (let attempt = 0; attempt < attempts; attempt++) {
       const body = (withConfig: boolean) => ({
         contents: [{ role: "user", parts: [...refs, { text: prompt }] }],
         generationConfig: withConfig ? { responseModalities: ["IMAGE"], imageConfig: { aspectRatio: ratio } } : { responseModalities: ["TEXT", "IMAGE"] },
@@ -294,7 +322,9 @@ async function generateImage(prompt: string, refs: Part[], models: string[], rat
       const parts = data?.candidates?.[0]?.content?.parts ?? [];
       for (const p of parts) {
         const inline = p.inlineData ?? p.inline_data;
-        if (inline?.data) return { model, mime: (inline.mimeType ?? inline.mime_type ?? "image/png") as string, data: inline.data as string };
+        if (inline?.data) {
+          return { model, mime: (inline.mimeType ?? inline.mime_type ?? "image/png") as string, data: inline.data as string, usd: usageUsd(model, data?.usageMetadata) };
+        }
       }
       lastError = "La IA no devolvió imagen (puede haber sido bloqueada por las políticas de contenido).";
       break;
@@ -386,10 +416,10 @@ async function phaseText(id: string, selfUrl: string) {
   try {
     if (!key()) throw new Error("Falta configurar GEMINI_API_KEY en los secretos de Supabase.");
     const photos = await loadPhotos(row);
-    const { model, result } = await generateText([...photos, { text: buildPrompt(row, photos.length > 0) }]);
+    const { model, result, usd } = await generateText([...photos, { text: buildPrompt(row, photos.length > 0) }]);
     await adminClient()
       .from("ai_landings")
-      .update({ result: { ...result, modelo: model, _stage: "imagenes_pendiente" } })
+      .update({ result: { ...result, modelo: model, _texto_usd: round4(usd), _stage: "imagenes_pendiente" } })
       .eq("id", id);
     await callSelf(selfUrl, id, "images");
   } catch (e) {
@@ -397,47 +427,75 @@ async function phaseText(id: string, selfUrl: string) {
   }
 }
 
-/** Modelo para las fotos con personas (Ajustes); por defecto Nano Banana 2. */
-async function peopleModel() {
-  const { data: cfg } = await adminClient().from("settings").select("landing_image_model").eq("id", 1).maybeSingle();
-  return (cfg?.landing_image_model as string | undefined) || NANO_2;
+/** Tope de gasto por landing (Ajustes) y el modelo de mejor calidad para las fotos con personas. */
+async function photoBudget() {
+  const { data: cfg } = await adminClient().from("settings").select("*").eq("id", 1).maybeSingle();
+  const maxCop = Number(cfg?.landing_max_cop ?? 500);
+  return { maxCop: Number.isFinite(maxCop) ? maxCop : 500, best: (cfg?.landing_image_model as string | undefined) || NANO_2 };
 }
 
-/** Fotos con personas: el modelo de calidad primero. La escena del problema: el económico primero. */
-function modelsFor(slot: Slot, preferred: string) {
-  const first = slot === "antes" ? NANO_ECO : preferred;
-  return [first, ...IMAGE_MODELS.filter((m) => m !== first)];
+/**
+ * Con lo que queda del tope, decide qué fotos se hacen con IA y en qué modelo:
+ * primero todas las que quepan en el económico (después → usos → antes) y, si sobra,
+ * la del después y la de usos suben al modelo de mejor calidad.
+ */
+function planPhotos(leftUsd: number, best: string) {
+  const eco = PHOTO_USD[NANO_ECO];
+  const upgrade = (PHOTO_USD[best] ?? PHOTO_USD[NANO_2]) - eco;
+  const count = Math.max(0, Math.min(SLOTS.length, Math.floor((leftUsd + 1e-9) / eco)));
+  const picks: Partial<Record<Slot, string>> = {};
+  let left = leftUsd - count * eco;
+  for (const slot of SLOTS.slice(0, count)) picks[slot] = NANO_ECO;
+  for (const slot of ["despues", "usos"] as Slot[]) {
+    if (picks[slot] && best !== NANO_ECO && left >= upgrade) {
+      picks[slot] = best;
+      left -= upgrade;
+    }
+  }
+  return picks;
 }
 
-async function makeSlotImage(row: Row, slot: Slot, result: Record<string, unknown>, refs: Part[], preferred: string) {
-  const img = await generateImage(imagePrompt(slot, result, refs.length > 0), refs, modelsFor(slot, preferred), SLOT_RATIO[slot]);
+/** El modelo elegido y, de respaldo, solo modelos más baratos (para no pasarse del tope). */
+function modelsFor(model: string) {
+  const price = PHOTO_USD[model] ?? PHOTO_USD[NANO_2];
+  return [model, ...IMAGE_MODELS.filter((m) => m !== model && (PHOTO_USD[m] ?? Infinity) < price)];
+}
+
+async function makeSlotImage(row: Row, slot: Slot, result: Record<string, unknown>, refs: Part[], model: string) {
+  const img = await generateImage(imagePrompt(slot, result, refs.length > 0), refs, modelsFor(model), SLOT_RATIO[slot]);
   const ext = img.mime.includes("jpeg") ? "jpg" : img.mime.includes("webp") ? "webp" : "png";
   const path = `${row.user_id}/${row.id}/base-${slot}.${ext}`;
   const { error } = await adminClient().storage.from(BUCKET).upload(path, fromBase64(img.data), { contentType: img.mime, upsert: true });
   if (error) throw new Error(`No se pudo guardar la imagen: ${error.message}`);
-  return { path, model: img.model };
+  return { path, model: img.model, usd: img.usd };
 }
 
-/** Fase 2: las 3 fotos con IA (en paralelo). Si fallan, la landing sale igual con las fotos del alumno. */
+/** Fase 2: las fotos con IA que caben en el tope (en paralelo). Si fallan, la landing sale igual con las fotos del alumno. */
 async function phaseImages(id: string) {
   const row = await claim(id, "imagenes_pendiente", "imagenes");
   if (!row) return;
   const admin = adminClient();
   const result = { ...(row.result ?? {}) } as Record<string, unknown>;
   delete result._stage;
+  const textUsd = Number(result._texto_usd ?? TEXT_USD_EST);
+  delete result._texto_usd;
   try {
     const refs = (await loadPhotos(row)).slice(0, 2);
-    const preferred = await peopleModel();
+    const cfg = await photoBudget();
+    const picks = planPhotos(cfg.maxCop / COP_PER_USD - textUsd, cfg.best);
+    const slots = Object.keys(picks) as Slot[];
     const images: Record<string, string> = {};
+    const models: Record<string, string> = {};
     const errors: string[] = [];
     let billing = false;
-    let imageModel = "";
+    let photosUsd = 0;
     await Promise.all(
-      SLOTS.map(async (slot) => {
+      slots.map(async (slot) => {
         try {
-          const saved = await makeSlotImage(row, slot, result, refs, preferred);
-          if (slot !== "antes") imageModel = saved.model;
+          const saved = await makeSlotImage(row, slot, result, refs, picks[slot]!);
           images[slot] = saved.path;
+          models[slot] = saved.model;
+          photosUsd += saved.usd;
         } catch (e) {
           if (e instanceof ImageError && e.billing) billing = true;
           errors.push(`${slot}: ${String((e as Error)?.message ?? e).slice(0, 200)}`);
@@ -447,14 +505,21 @@ async function phaseImages(id: string) {
     const aviso = billing
       ? "Las fotos con IA necesitan saldo en la cuenta de Gemini de la academia. Armamos la landing con tus fotos del producto."
       : errors.length
-        ? `${errors.length} de ${SLOTS.length} fotos no se pudieron generar; en su lugar usamos tu foto del producto.`
+        ? `${errors.length} de ${slots.length} fotos no se pudieron generar; en su lugar usamos tu foto del producto.`
         : null;
+    const totalUsd = textUsd + photosUsd;
     await admin
       .from("ai_landings")
       .update({
         status: "listo",
         images,
-        result: { ...result, modelo_imagenes: imageModel || null, aviso_imagenes: aviso, errores_imagenes: errors.length ? errors : null },
+        result: {
+          ...result,
+          modelos_fotos: models,
+          costo: { texto_usd: round4(textUsd), fotos_usd: round4(photosUsd), total_usd: round4(totalUsd), total_cop: Math.round(totalUsd * COP_PER_USD), tope_cop: cfg.maxCop },
+          aviso_imagenes: aviso,
+          errores_imagenes: errors.length ? errors : null,
+        },
         finished_at: new Date().toISOString(),
         error: null,
       })
@@ -528,10 +593,17 @@ Deno.serve(async (req) => {
     const { data: full } = await admin.from("ai_landings").select("*").eq("id", id).single();
     try {
       const refs = (await loadPhotos(full as Row)).slice(0, 2);
-      const saved = await makeSlotImage(full as Row, slot as Slot, full.result, refs, await peopleModel());
+      // Se rehace con el mismo modelo con que salió (o el económico si no se había hecho con IA): cuesta lo mismo.
+      const model = (full.result?.modelos_fotos?.[slot] as string | undefined) ?? NANO_ECO;
+      const saved = await makeSlotImage(full as Row, slot as Slot, full.result, refs, model);
+      const costo = { ...(full.result?.costo ?? {}) };
+      costo.rehacer_usd = round4(Number(costo.rehacer_usd ?? 0) + saved.usd);
       await admin
         .from("ai_landings")
-        .update({ images: { ...(full.images ?? {}), [slot]: saved.path }, result: { ...full.result, rehechas: Number(full.result?.rehechas ?? 0) + 1 } })
+        .update({
+          images: { ...(full.images ?? {}), [slot]: saved.path },
+          result: { ...full.result, rehechas: Number(full.result?.rehechas ?? 0) + 1, modelos_fotos: { ...(full.result?.modelos_fotos ?? {}), [slot]: saved.model }, costo },
+        })
         .eq("id", id);
       const { data: bal } = await admin.rpc("points_balance", { p_user: user.id });
       const balance = (Array.isArray(bal) ? bal[0] : bal)?.balance ?? null;

@@ -25,6 +25,7 @@ export async function updateSettings(formData: FormData) {
       allow_signup: formData.get("allow_signup") === "on",
       auto_approve: formData.get("auto_approve") === "on",
       landing_image_model: IMAGE_MODELS.some((m) => m.id === str(formData, "landing_image_model")) ? str(formData, "landing_image_model") : IMAGE_MODELS[0].id,
+      landing_max_cop: Math.round(clampNum(str(formData, "landing_max_cop"), 0, 10000, 500)),
       points_monthly_kit: Math.round(clampNum(str(formData, "points_monthly_kit"), 0, 1000000, 1000)),
       points_monthly_member: Math.round(clampNum(str(formData, "points_monthly_member"), 0, 1000000, 1000)),
       points_landing: Math.round(clampNum(str(formData, "points_landing"), 0, 100000, 270)),

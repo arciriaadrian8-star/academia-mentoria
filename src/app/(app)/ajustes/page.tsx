@@ -6,13 +6,28 @@ import { FormMessage } from "@/components/FormMessage";
 import { ImageUpload } from "@/components/ImageUpload";
 import { PageHeader } from "@/components/PageHeader";
 import { SubmitButton } from "@/components/SubmitButton";
-import { IMAGE_MODELS, landingCostCop } from "@/lib/landing";
+import { photosForBudget } from "@/lib/landing";
 import { updateSettings } from "./actions";
 
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ guardado?: string }> }) {
   const { guardado } = await searchParams;
-  await requireAdmin();
-  const [settings, providers, origin] = await Promise.all([getSettings(), getAuthProviders(), getOrigin()]);
+  const { supabase } = await requireAdmin();
+  const [settings, providers, origin, { data: recent }] = await Promise.all([
+    getSettings(),
+    getAuthProviders(),
+    getOrigin(),
+    supabase
+      .from("ai_landings")
+      .select("costo:result->costo")
+      .eq("status", "listo")
+      .not("result->costo", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(20),
+  ]);
+  const budget = photosForBudget(settings.landing_max_cop);
+  // Gasto real medido de las últimas landings (texto + fotos, sin contar las fotos rehechas).
+  const costs = ((recent ?? []) as { costo: { total_cop?: number } | null }[]).map((r) => Number(r.costo?.total_cop)).filter((n) => Number.isFinite(n));
+  const avgCost = costs.length ? Math.round(costs.reduce((a, b) => a + b, 0) / costs.length) : null;
   const signupUrl = `${origin}/registro`;
 
   return (
@@ -98,22 +113,29 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
             <div>
               <label className="label" htmlFor="points_landing">Crear una landing cuesta</label>
               <input id="points_landing" name="points_landing" type="number" min={0} defaultValue={settings.points_landing} className="input" />
-              <p className="hint">Gasto real en Gemini: ~COP {landingCostCop(settings.landing_image_model)}.</p>
+              <p className="hint">Gasto en Gemini con tu tope: ~COP {budget.costCop}.</p>
             </div>
             <div>
               <label className="label" htmlFor="points_redo">Rehacer una foto cuesta</label>
               <input id="points_redo" name="points_redo" type="number" min={0} defaultValue={settings.points_redo} className="input" />
-              <p className="hint">Gasto real en Gemini: ~COP 125 a 213.</p>
+              <p className="hint">Gasto en Gemini: ~COP 140 (económico) o 240 (Nano Banana 2).</p>
             </div>
           </div>
           <div>
-            <label className="label" htmlFor="landing_image_model">Modelo de las fotos con personas</label>
-            <select id="landing_image_model" name="landing_image_model" defaultValue={settings.landing_image_model} className="input">
-              {IMAGE_MODELS.map((m) => (
-                <option key={m.id} value={m.id}>{m.label} (~COP {m.costCop} por landing)</option>
-              ))}
-            </select>
+            <label className="label" htmlFor="landing_max_cop">Gasto máximo de IA por landing (COP)</label>
+            <input id="landing_max_cop" name="landing_max_cop" type="number" min={0} step={10} defaultValue={settings.landing_max_cop} className="input" />
+            <p className="hint">
+              Con este tope cada landing lleva fotos con IA de: <strong>{budget.label}</strong> (~COP {budget.costCop}). El estilo (titulares, precios, sellos,
+              antes/después) lo dibuja el sistema gratis; lo que se paga es la foto de fondo. Con 500 salen las 3 fotos en el modelo económico; desde 600 la
+              foto principal sube a Nano Banana 2.
+            </p>
+            <p className="hint">
+              {avgCost !== null
+                ? `Gasto real de tus últimas ${costs.length} landings: promedio COP ${avgCost} (mín. ${Math.min(...costs)} · máx. ${Math.max(...costs)}).`
+                : "Aún no hay landings con el gasto real medido: aparecerá aquí después de la próxima."}
+            </p>
           </div>
+          <input type="hidden" name="landing_image_model" value={settings.landing_image_model} />
           <p className="rounded-lg bg-zinc-50 p-3 text-xs text-zinc-600">
             Con {settings.points_monthly_kit} puntos un alumno de la academia puede crear{" "}
             <strong>{settings.points_landing ? Math.floor(settings.points_monthly_kit / settings.points_landing) : "∞"} landings</strong> al mes

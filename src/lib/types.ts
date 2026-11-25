@@ -31,8 +31,9 @@ export interface Settings {
   welcome_message: string | null;
   allow_signup: boolean;
   auto_approve: boolean;
-  /** MakeDrop Landing: modelo de las fotos con personas. */
+  /** MakeDrop Landing: modelo de mejor calidad para las fotos con personas y tope de gasto de IA por landing (COP). */
   landing_image_model: string;
+  landing_max_cop: number;
   /** Puntos de IA: bolsa mensual por defecto (academia = rol kit, mentoría = rol member) y costo de cada acción. */
   points_monthly_kit: number;
   points_monthly_member: number;

@@ -17,7 +17,9 @@ alter table public.settings
   add column if not exists points_monthly_kit int not null default 1000 check (points_monthly_kit between 0 and 1000000),
   add column if not exists points_monthly_member int not null default 1000 check (points_monthly_member between 0 and 1000000),
   add column if not exists points_landing int not null default 270 check (points_landing between 0 and 100000),
-  add column if not exists points_redo int not null default 80 check (points_redo between 0 and 100000);
+  add column if not exists points_redo int not null default 80 check (points_redo between 0 and 100000),
+  -- Tope de gasto de IA por landing (COP): la IA hace las fotos de mejor calidad que quepan en el tope.
+  add column if not exists landing_max_cop int not null default 500 check (landing_max_cop between 0 and 10000);
 
 -- Puntos mensuales de cada alumno (vacío = los de Ajustes según su tipo).
 alter table public.member_billing drop column if exists monthly_usd;

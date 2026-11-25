@@ -66,6 +66,7 @@ const DEFAULT_SETTINGS: Settings = {
   allow_signup: true,
   auto_approve: false,
   landing_image_model: "gemini-3.1-flash-image-preview",
+  landing_max_cop: 500,
   points_monthly_kit: 1000,
   points_monthly_member: 1000,
   points_landing: 270,

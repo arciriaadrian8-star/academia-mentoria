@@ -1,16 +1,36 @@
 /** MakeDrop Landing: tipos, plantilla HTML de la descripción y archivo de importación para Shopify. */
 
 export const LANDING_TOOL_NAME = "MakeDrop Landing";
-/**
- * Modelo de las 2 fotos con personas y costo aproximado de cada landing (3 fotos con IA + texto).
- * La foto del producto solo siempre usa el modelo económico.
- */
+/** Modelos de fotos con IA y su gasto aproximado por foto (precios públicos de Gemini, dólar a ~COP 3.500). */
 export const IMAGE_MODELS = [
-  { id: "gemini-3.1-flash-image-preview", label: "Nano Banana 2 · mejor calidad", costUsd: 0.15, costCop: 575 },
-  { id: "gemini-2.5-flash-image", label: "Nano Banana · más económico", costUsd: 0.1, costCop: 400 },
+  { id: "gemini-3.1-flash-image-preview", label: "Nano Banana 2 · mejor calidad", photoCop: 240 },
+  { id: "gemini-2.5-flash-image", label: "Nano Banana · económico", photoCop: 140 },
 ] as const;
-export const landingCost = (model: string) => IMAGE_MODELS.find((m) => m.id === model)?.costUsd ?? IMAGE_MODELS[0].costUsd;
-export const landingCostCop = (model: string) => IMAGE_MODELS.find((m) => m.id === model)?.costCop ?? IMAGE_MODELS[0].costCop;
+const TEXT_COP = 45;
+
+/**
+ * Qué fotos con IA alcanzan con el tope de gasto por landing (misma regla que la función makedrop-landing):
+ * primero todas las que quepan en el modelo económico (después → usos → antes) y, si sobra,
+ * la del después y la de usos suben a Nano Banana 2. Las que no se hacen con IA salen con la foto del alumno.
+ */
+export function photosForBudget(maxCop: number) {
+  const [best, eco] = IMAGE_MODELS;
+  const slots = ["después", "usos", "antes"];
+  const count = Math.max(0, Math.min(3, Math.floor((maxCop - TEXT_COP) / eco.photoCop)));
+  let left = maxCop - TEXT_COP - count * eco.photoCop;
+  const picks = slots.slice(0, count).map((slot) => ({ slot, best: false }));
+  for (const pick of picks.slice(0, 2)) {
+    if (left >= best.photoCop - eco.photoCop) {
+      pick.best = true;
+      left -= best.photoCop - eco.photoCop;
+    }
+  }
+  const costCop = TEXT_COP + picks.reduce((sum, pk) => sum + (pk.best ? best.photoCop : eco.photoCop), 0);
+  const label = picks.length
+    ? picks.map((pk) => `${pk.slot}${pk.best ? " (Nano Banana 2)" : ""}`).join(", ")
+    : "ninguna (solo texto; las imágenes salen con la foto del alumno)";
+  return { count: picks.length, costCop, label };
+}
 
 /** Bolsa de puntos del mes (null = sin límite: admin y coaches). Viene de la función points_balance de la base de datos. */
 export type PointsBalance = { allowance: number | null; used: number; balance: number | null };

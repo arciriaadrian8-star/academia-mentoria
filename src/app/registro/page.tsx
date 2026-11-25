@@ -25,7 +25,7 @@ export default async function RegisterPage({ searchParams }: { searchParams: Pro
     <AuthCard
       settings={settings}
       title="Crea tu cuenta"
-      subtitle="Entra a MakeDrop IA: tu landing ganadora para Shopify en 40 segundos."
+      subtitle="Entra a MakeDrop IA, la plataforma de dropshipping con IA para vender en contra entrega."
     >
       {providers.google && (
         <>

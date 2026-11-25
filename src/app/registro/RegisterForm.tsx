@@ -8,8 +8,8 @@ import { SubmitButton } from "@/components/SubmitButton";
 import { register } from "./actions";
 
 const MEMBER_OPTIONS = [
-  { value: "si", title: "Sí, soy miembro", text: "Tu mentor aprueba tu cuenta y entras con todo incluido.", icon: GraduationCap },
-  { value: "no", title: "No, todavía no", text: "Creas tu cuenta y activas MakeDrop IA para usar las herramientas.", icon: Rocket },
+  { value: "si", title: "Sí, soy miembro", text: "Todo incluido: tu mentor aprueba tu cuenta y te da acceso.", icon: GraduationCap },
+  { value: "no", title: "No, solo la plataforma", text: "Creas tu cuenta y activas tu suscripción mensual a MakeDrop IA.", icon: Rocket },
 ] as const;
 
 export function RegisterForm({ defaultMember }: { defaultMember?: "si" | "no" }) {

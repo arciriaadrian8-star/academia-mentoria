@@ -65,7 +65,7 @@ export interface BillingConfig {
 
 export const DEFAULT_CONFIG: BillingConfig = {
   nequi_number: null, wompi_link: null, reminder_days: 3, template_manual: null, template_overdue: null,
-  template_auto_failed: null, days_before: 1, auto_whatsapp: true,
+  template_auto_failed: null, days_before: 1, auto_whatsapp: false,
 };
 
 export interface ReminderLog {

@@ -1500,7 +1500,7 @@ grant all on public.student_billing_config to service_role;
 
 alter table public.student_billing_config
   add column if not exists days_before   integer not null default 1 check (days_before between 1 and 10),
-  add column if not exists auto_whatsapp boolean not null default true;
+  add column if not exists auto_whatsapp boolean not null default false;
 
 create table if not exists public.student_reminders_log (
   enrollment_id uuid not null references public.student_enrollments(id) on delete cascade,

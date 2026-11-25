@@ -296,3 +296,26 @@ export async function importStudents(_prev: ImportResult | null, formData: FormD
   refresh();
   return { added: rows.length, linked: rows.filter((r) => r.user_id).length, skipped };
 }
+
+/**
+ * «Mensajes de hoy»: Cowork (o tú) marca cada recordatorio como enviado por WhatsApp o Skool.
+ * Queda en el registro (no se vuelve a pedir) y en el seguimiento del alumno.
+ */
+export async function markSent(formData: FormData) {
+  const { user } = await requireAdmin();
+  const id = str(formData, "enrollment_id");
+  const stage = ["antes", "hoy", "vencido"].includes(str(formData, "stage")) ? str(formData, "stage") : "antes";
+  const due = parseDate(str(formData, "due_date"));
+  const channel = str(formData, "channel") === "skool" ? "Skool" : "WhatsApp";
+  if (!id || !due) return;
+  const admin = createAdminClient();
+  const { data: prev } = await admin.from("student_reminders_log").select("status, detail")
+    .eq("enrollment_id", id).eq("stage", stage).eq("due_date", due).maybeSingle();
+  const detail = prev?.status === "enviado" && prev.detail && !prev.detail.includes(channel) ? `${prev.detail} + ${channel}` : channel;
+  await admin.from("student_reminders_log").upsert({ enrollment_id: id, stage, due_date: due, status: "enviado", detail });
+  await admin.from("student_enrollments").update({ last_reminder_at: new Date().toISOString() }).eq("id", id);
+  const when = stage === "antes" ? "antes del pago" : stage === "hoy" ? "el día del pago" : "pago atrasado";
+  await admin.from("student_followups").insert({ enrollment_id: id, kind: "recordatorio", note: `Recordatorio (${when}) enviado por ${channel}.`, created_by: user.id });
+  revalidatePath(`${BASE}/hoy`);
+  refresh(id);
+}

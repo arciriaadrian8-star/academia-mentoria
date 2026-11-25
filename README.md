@@ -120,7 +120,11 @@ Puedes reordenar módulos y lecciones con las flechas ↑ ↓ y guardar leccione
 - **Meta de renovación**: barra con el % de alumnos que renovaron este mes, frente a la meta del **80 %**.
 - Base de datos: aplica `supabase/upgrade-14-control-alumnos.sql` y `supabase/upgrade-15-recordatorios-whatsapp.sql` en el SQL Editor.
 
-#### Recordatorios automáticos por WhatsApp (1 día antes del pago)
+#### Recordatorios con Cowork desde tu WhatsApp (recomendado)
+
+La página **Control de alumnos → Mensajes de hoy** muestra, para cada alumno de pago manual que paga mañana, hoy o va 2 días atrasado: su número de WhatsApp, el valor exacto, la fecha y el mensaje listo, con botones «Abrir chat de WhatsApp» y «Marcar enviado». Cowork la lee cada mañana y envía los mensajes desde tu WhatsApp (y por Skool). Instrucciones y la tarea para pegar en Cowork: [`docs/cowork-recordatorios.md`](docs/cowork-recordatorios.md).
+
+#### (Opcional) Recordatorios automáticos con la API de WhatsApp Business
 
 A los alumnos de **pago manual** (Nequi, Wompi y otros) les llega un WhatsApp automático **1 día antes** de su fecha de pago (se puede cambiar en el panel), otro **el día del pago** y otro **a los 2 días** si todavía no han pagado. Sale todos los días a las 9 a.m. hora Colombia y nunca se repite el mismo aviso.
 

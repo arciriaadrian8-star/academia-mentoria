@@ -117,6 +117,7 @@ export default async function StudentsControlPage({ searchParams }: { searchPara
         title="Control de alumnos"
         description="Acompañamiento y membresías en un solo lugar: Nequi y Wompi (les cobras tú) y Whop y Skool (se cobran solos)."
       >
+        <Link href="/miembros/alumnos/hoy" className="btn btn-secondary"><BellRing className="size-4" /> Mensajes de hoy (Cowork)</Link>
         <Link href="/miembros/alumnos/importar" className="btn btn-secondary"><Upload className="size-4" /> Importar</Link>
         <Link href="/miembros/alumnos/nuevo" className="btn btn-primary"><Plus className="size-4" /> Agregar alumno</Link>
       </PageHeader>
@@ -180,9 +181,9 @@ export default async function StudentsControlPage({ searchParams }: { searchPara
       <h2 className="mb-1 flex items-center gap-2 text-lg font-bold"><BellRing className="size-5 text-emerald-600" /> Recordatorios: pagan {cfg.days_before === 1 ? "mañana" : `en ${cfg.days_before} días`} ({formatDay(reminderDate)})</h2>
       <p className="mb-3 text-sm text-zinc-500">
         {cfg.auto_whatsapp
-          ? "Les llega un WhatsApp automático a las 9 a.m. (y otro el día del pago y a los 2 días si no han pagado). Para Skool, copia el mensaje y pégalo en su chat."
-          : "El envío automático está apagado: envíales el WhatsApp con el botón y copia el mensaje para Skool."}
-        {lastRun && <> Último envío automático: {timeAgo(lastRun)}.</>}
+          ? "Les llega un WhatsApp automático por la API de WhatsApp Business a las 9 a.m."
+          : <>Cowork se los envía desde tu WhatsApp con la página <Link href="/miembros/alumnos/hoy" className="text-brand underline">Mensajes de hoy</Link> (ahí están el número, el valor y el mensaje exacto de cada uno).</>}
+        {lastRun && <> Último recordatorio registrado: {timeAgo(lastRun)}.</>}
       </p>
       {upcomingReminders.length === 0 ? (
         <p className="card mb-8 p-4 text-sm text-zinc-500">Nadie con pago manual {cfg.days_before === 1 ? "mañana" : "ese día"}.</p>
@@ -198,9 +199,9 @@ export default async function StudentsControlPage({ searchParams }: { searchPara
                 </div>
                 {log ? (
                   <span className={cn("chip", REMINDER_STATUS[log.status].className)} title={log.detail ?? undefined}>{REMINDER_STATUS[log.status].label}</span>
-                ) : cfg.auto_whatsapp ? (
-                  <span className="chip bg-zinc-100 text-zinc-600">Sale automático a las 9 a.m.</span>
-                ) : null}
+                ) : (
+                  <span className="chip bg-amber-100 text-amber-800">Pendiente</span>
+                )}
                 <ReminderButton id={e.id} href={reminder(e, state)} label="WhatsApp" />
                 <CopyButton text={preMessage(e)} label="Copiar para Skool" />
               </li>
@@ -371,15 +372,15 @@ export default async function StudentsControlPage({ searchParams }: { searchPara
             <input id="reminder_days" name="reminder_days" type="number" min={0} max={30} defaultValue={cfg.reminder_days} className="input" />
           </div>
           <div>
-            <label className="label" htmlFor="days_before">Recordatorio automático: días antes del pago</label>
+            <label className="label" htmlFor="days_before">Recordar cuántos días antes del pago</label>
             <input id="days_before" name="days_before" type="number" min={1} max={10} defaultValue={cfg.days_before} className="input" />
           </div>
           <label className="flex items-start gap-2 text-sm sm:col-span-2">
             <input type="checkbox" name="auto_whatsapp" defaultChecked={cfg.auto_whatsapp} className="mt-0.5 accent-brand" />
             <span>
-              <span className="font-medium">Enviar recordatorios automáticos por WhatsApp</span>
+              <span className="font-medium">Enviar por la API de WhatsApp Business (opcional)</span>
               <span className="block text-xs text-zinc-500">
-                Solo a los de pago manual. Necesita la API de WhatsApp Business configurada (ver README, «Recordatorios automáticos»).
+                Déjalo apagado si Cowork envía los mensajes desde tu WhatsApp. Actívalo solo si configuras la API de Meta (ver README).
               </span>
             </span>
           </label>

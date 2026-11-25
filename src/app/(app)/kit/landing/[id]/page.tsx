@@ -75,6 +75,7 @@ export default async function LandingResultPage({ params }: { params: Promise<{ 
   const studio: StudioProps = {
     landingId: row.id,
     mode: isLandingMode(row.mode) ? row.mode : "completa",
+    country: row.country ?? "Colombia",
     userId: row.user_id,
     code: row.code,
     result: row.result as LandingResult,

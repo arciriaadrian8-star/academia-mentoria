@@ -18,6 +18,7 @@ import {
   Loader2,
   Palette,
   PenLine,
+  ShieldCheck,
   Sparkles,
   Store,
   WandSparkles,
@@ -42,6 +43,7 @@ import {
   type PhotoSlot,
 } from "@/lib/landing";
 import { CopyButton } from "@/components/CopyButton";
+import { PRICE_BLOCK_STEPS, priceBlockLiquid, priceBlockPreview, type PriceBlockOptions } from "@/lib/priceBlock";
 import { shrinkImage } from "../shrink";
 import { composeImage, inkFor, loadBitmap, type Brand, type Fonts, type Look } from "./compose";
 
@@ -51,6 +53,7 @@ type AiSlot = "despues" | "usos" | "antes" | "principal" | "uso_1" | "uso_2" | "
 export type StudioProps = {
   landingId: string;
   mode: LandingMode;
+  country: string;
   userId: string;
   code: string;
   result: LandingResult;
@@ -120,6 +123,14 @@ export function LandingStudio(props: StudioProps) {
   const [balance, setBalance] = useState<number | null>(props.pointsBalance);
   const canRedo = balance === null || balance >= props.redoCost;
   const [tab, setTab] = useState<Tab>(FIRST_TAB[props.mode] ?? "landing");
+  // Bloque de precio y confianza para Shopify («Liquid personalizado»).
+  const [pb, setPb] = useState({ city: "", minDays: 2, maxDays: 7, whatsapp: true, guarantee: true, retracto: /colombia/i.test(props.country) });
+  const priceOpts: PriceBlockOptions = useMemo(
+    () => ({ ...pb, store: brand.storeName, country: props.country, freeShipping: brand.freeShipping, cod: brand.cod }),
+    [pb, brand.storeName, brand.freeShipping, brand.cod, props.country],
+  );
+  const priceLiquid = useMemo(() => priceBlockLiquid(priceOpts), [priceOpts]);
+  const pricePreview = useMemo(() => priceBlockPreview(priceOpts, props.price, props.comparePrice), [priceOpts, props.price, props.comparePrice]);
   // Fotos de fondo que el alumno cambió en esta visita (las aplica aunque las imágenes aún no estén cargadas).
   const overrides = useRef<Partial<Record<PhotoSlot, ImageBitmap>>>({});
   const [baseUrls, setBaseUrls] = useState<Partial<Record<PhotoSlot, string>>>(() => ({
@@ -306,6 +317,10 @@ export function LandingStudio(props: StudioProps) {
       if (props.gifUrl) files[fileName(code, "gif")] = new Uint8Array(await (await fetch(props.gifUrl)).arrayBuffer());
       const enc = new TextEncoder();
       files["descripcion-shopify.html"] = enc.encode(shopifyHtml);
+      files["bloque-precio-shopify.liquid"] = enc.encode(priceLiquid);
+      files["como-usar-bloque-precio.txt"] = enc.encode(
+        ["BLOQUE DE PRECIO Y CONFIANZA (Liquid personalizado)", ...PRICE_BLOCK_STEPS.map((x, i) => `${i + 1}. ${x}`)].join("\n"),
+      );
       files["textos.txt"] = enc.encode(
         [`TÍTULO:\n${r.titulo}`, `BARRA DE ANUNCIO:\n${r.barra_anuncio}`, `SEO TÍTULO:\n${r.seo.titulo}`, `SEO DESCRIPCIÓN:\n${r.seo.descripcion}`].join("\n\n"),
       );
@@ -415,16 +430,8 @@ export function LandingStudio(props: StudioProps) {
                 </div>
                 <div>
                   <h2 className="text-lg leading-snug font-bold sm:text-xl">{r.titulo}</h2>
-                  <p className="mt-3 flex flex-wrap items-baseline gap-2">
-                    <span className="text-2xl font-extrabold">{props.price}</span>
-                    {props.comparePrice && <span className="text-zinc-400 line-through">{props.comparePrice}</span>}
-                    {discountPct(props.price, props.comparePrice) ? (
-                      <span className="chip text-white" style={{ background: brand.color, color: inkFor(brand.color) }}>
-                        -{discountPct(props.price, props.comparePrice)}%
-                      </span>
-                    ) : null}
-                  </p>
-                  <div className="mt-4 rounded-xl border-2 border-dashed border-zinc-300 p-4 text-center text-sm text-zinc-500">
+                  <div className="mt-3 origin-top-left [zoom:0.82]" dangerouslySetInnerHTML={{ __html: pricePreview }} />
+                  <div className="mt-2 rounded-xl border-2 border-dashed border-zinc-300 p-4 text-center text-sm text-zinc-500">
                     Aquí va el botón de compra de <strong>Releasit</strong>
                   </div>
                 </div>
@@ -523,6 +530,57 @@ export function LandingStudio(props: StudioProps) {
                 </label>
               </div>
               {composing && <p className="flex items-center gap-2 text-xs text-zinc-500"><Loader2 className="size-3.5 animate-spin" /> Dibujando imágenes…</p>}
+            </section>
+
+            <section className="card space-y-3 p-5">
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="flex items-center gap-2 font-semibold"><ShieldCheck className="size-4 text-brand" /> Bloque de precio</h2>
+                <CopyButton text={priceLiquid} label="Copiar código" />
+              </div>
+              <p className="text-xs text-zinc-500">
+                Precio, descuento y «Compra segura» como en la vista previa. Se pega una sola vez en tu tema y sirve para todos tus productos (también va en el ZIP).
+              </p>
+              <div>
+                <label className="label" htmlFor="pb-city">Ciudad de despacho</label>
+                <input
+                  id="pb-city"
+                  className="input"
+                  maxLength={40}
+                  placeholder={`Vacío = «a todo ${props.country}»`}
+                  value={pb.city}
+                  onChange={(e) => setPb({ ...pb, city: e.target.value })}
+                />
+              </div>
+              <div>
+                <span className="label">Se entrega entre (días)</span>
+                <div className="flex items-center gap-2 text-sm text-zinc-600">
+                  <input type="number" min={0} max={30} aria-label="Días mínimos" className="input w-20" value={pb.minDays} onChange={(e) => setPb({ ...pb, minDays: Number(e.target.value) })} />
+                  y
+                  <input type="number" min={0} max={45} aria-label="Días máximos" className="input w-20" value={pb.maxDays} onChange={(e) => setPb({ ...pb, maxDays: Number(e.target.value) })} />
+                  días
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
+                <label className="flex items-center gap-2">
+                  <input type="checkbox" checked={pb.whatsapp} onChange={(e) => setPb({ ...pb, whatsapp: e.target.checked })} /> Confirmación por WhatsApp
+                </label>
+                <label className="flex items-center gap-2">
+                  <input type="checkbox" checked={pb.guarantee} onChange={(e) => setPb({ ...pb, guarantee: e.target.checked })} /> Compra garantizada
+                </label>
+                {/colombia/i.test(props.country) && (
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" checked={pb.retracto} onChange={(e) => setPb({ ...pb, retracto: e.target.checked })} /> Derecho de retracto
+                  </label>
+                )}
+              </div>
+              <ol className="space-y-1.5 text-xs text-zinc-600">
+                {PRICE_BLOCK_STEPS.map((step, i) => (
+                  <li key={step} className="flex gap-2">
+                    <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-[10px] font-bold text-zinc-700">{i + 1}</span>
+                    <span>{step}</span>
+                  </li>
+                ))}
+              </ol>
             </section>
           </aside>
         </div>

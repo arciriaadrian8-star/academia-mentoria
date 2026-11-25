@@ -29,6 +29,7 @@ export async function updateSettings(formData: FormData) {
       points_monthly_kit: Math.round(clampNum(str(formData, "points_monthly_kit"), 0, 1000000, 1000)),
       points_monthly_member: Math.round(clampNum(str(formData, "points_monthly_member"), 0, 1000000, 1000)),
       points_landing: Math.round(clampNum(str(formData, "points_landing"), 0, 100000, 270)),
+      points_landing_text: Math.round(clampNum(str(formData, "points_landing_text"), 0, 100000, 30)),
       points_redo: Math.round(clampNum(str(formData, "points_redo"), 0, 100000, 80)),
     })
     .eq("id", 1);

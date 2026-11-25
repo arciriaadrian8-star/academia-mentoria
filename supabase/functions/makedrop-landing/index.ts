@@ -8,6 +8,8 @@
 // POST { id } con el JWT del alumno. Responde 202 y sigue en segundo plano en 2 fases:
 //   "text"   → escribe todos los textos y las escenas de cada foto
 //   "images" → genera las 3 fotos tomando como referencia la foto del producto del alumno
+// Formatos (columna mode): «completa» hace las 2 fases; «rapida», «texto» y «prompts» solo la de texto
+// (las imágenes se arman con la foto del alumno y él puede hacer sus fotos gratis en Gemini con los prompts).
 // POST { id, slot } con el JWT del alumno: rehace solo esa foto.
 // Puntos de IA: crear la landing y rehacer una foto descuentan puntos de la bolsa mensual del alumno
 // (función spend_points). Si la IA falla, los puntos se devuelven.
@@ -145,6 +147,7 @@ type Row = Record<string, unknown> & {
   reviews: string | null;
   photo_paths: string[];
   status: string;
+  mode?: string;
   result: Record<string, unknown> | null;
 };
 
@@ -369,8 +372,8 @@ async function spend(userId: string, action: string, points: number, ref: string
 }
 
 async function pointsCost() {
-  const { data } = await adminClient().from("settings").select("points_landing, points_redo").eq("id", 1).maybeSingle();
-  return { landing: Number(data?.points_landing ?? 270), redo: Number(data?.points_redo ?? 80) };
+  const { data } = await adminClient().from("settings").select("*").eq("id", 1).maybeSingle();
+  return { landing: Number(data?.points_landing ?? 270), text: Number(data?.points_landing_text ?? 30), redo: Number(data?.points_redo ?? 80) };
 }
 
 async function loadPhotos(row: Row) {
@@ -417,6 +420,15 @@ async function phaseText(id: string, selfUrl: string) {
     if (!key()) throw new Error("Falta configurar GEMINI_API_KEY en los secretos de Supabase.");
     const photos = await loadPhotos(row);
     const { model, result, usd } = await generateText([...photos, { text: buildPrompt(row, photos.length > 0) }]);
+    if (row.mode && row.mode !== "completa") {
+      // Formatos sin fotos con IA: la landing queda lista apenas termina el texto.
+      const costo = { texto_usd: round4(usd), fotos_usd: 0, total_usd: round4(usd), total_cop: Math.round(usd * COP_PER_USD) };
+      await adminClient()
+        .from("ai_landings")
+        .update({ status: "listo", images: {}, result: { ...result, modelo: model, modelos_fotos: {}, costo }, finished_at: new Date().toISOString(), error: null })
+        .eq("id", id);
+      return;
+    }
     await adminClient()
       .from("ai_landings")
       .update({ result: { ...result, modelo: model, _texto_usd: round4(usd), _stage: "imagenes_pendiente" } })
@@ -577,7 +589,7 @@ Deno.serve(async (req) => {
   const user = userData?.user;
   if (!user) return json({ error: "No autorizado" }, 401);
 
-  const { data: row } = await userClient.from("ai_landings").select("id, user_id, status, result").eq("id", id).maybeSingle();
+  const { data: row } = await userClient.from("ai_landings").select("id, user_id, status, result, mode").eq("id", id).maybeSingle();
   if (!row || row.user_id !== user.id) return json({ error: "No encontrado" }, 404);
 
   // Rehacer solo una foto (cuesta puntos): se responde cuando la foto está lista.
@@ -594,7 +606,8 @@ Deno.serve(async (req) => {
     try {
       const refs = (await loadPhotos(full as Row)).slice(0, 2);
       // Se rehace con el mismo modelo con que salió (o el económico si no se había hecho con IA): cuesta lo mismo.
-      const model = (full.result?.modelos_fotos?.[slot] as string | undefined) ?? NANO_ECO;
+      const used = full.result?.modelos_fotos?.[slot] as string | undefined;
+      const model = used && PHOTO_USD[used] ? used : NANO_ECO;
       const saved = await makeSlotImage(full as Row, slot as Slot, full.result, refs, model);
       const costo = { ...(full.result?.costo ?? {}) };
       costo.rehacer_usd = round4(Number(costo.rehacer_usd ?? 0) + saved.usd);
@@ -632,8 +645,9 @@ Deno.serve(async (req) => {
     .maybeSingle();
   if (!queued) return json({ ok: true, status: "procesando" });
 
-  // Puntos de IA: crear la landing descuenta los puntos de Ajustes (admin y coaches no tienen límite).
-  const cost = (await pointsCost()).landing;
+  // Puntos de IA: crear la landing descuenta los puntos de Ajustes según el formato (admin y coaches no tienen límite).
+  const prices = await pointsCost();
+  const cost = row.mode && row.mode !== "completa" ? prices.text : prices.landing;
   const usageId = await spend(user.id, "landing", cost, id);
   if (usageId === null) {
     await admin.from("ai_landings").update({ status: "error", result: null, error: `No te alcanzan los puntos: crear una landing cuesta ${cost}.` }).eq("id", id);

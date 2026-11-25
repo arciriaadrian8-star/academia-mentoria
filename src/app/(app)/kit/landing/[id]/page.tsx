@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Trash2 } from "lucide-react";
 import { getSettings, requireKit } from "@/lib/auth";
 import { createAdminClient, hasAdminKey } from "@/lib/supabase/admin";
-import { getPointsBalance, LANDING_BUCKET, type LandingResult } from "@/lib/landing";
+import { getPointsBalance, isLandingMode, LANDING_BUCKET, modeInfo, type LandingResult } from "@/lib/landing";
 import { ConfirmButton } from "@/components/ConfirmButton";
 import { PageHeader } from "@/components/PageHeader";
 import { deleteLanding } from "../actions";
@@ -32,8 +32,8 @@ export default async function LandingResultPage({ params }: { params: Promise<{ 
     return (
       <>
         {back}
-        <PageHeader title={row.product} description="Creando tu landing completa para Shopify" />
-        <AutoRefresh since={row.created_at} />
+        <PageHeader title={row.product} description={`Creando: ${modeInfo(row.mode).title.toLowerCase()}`} />
+        <AutoRefresh since={row.created_at} mode={isLandingMode(row.mode) ? row.mode : "completa"} />
       </>
     );
   }
@@ -74,6 +74,7 @@ export default async function LandingResultPage({ params }: { params: Promise<{ 
 
   const studio: StudioProps = {
     landingId: row.id,
+    mode: isLandingMode(row.mode) ? row.mode : "completa",
     userId: row.user_id,
     code: row.code,
     result: row.result as LandingResult,
@@ -94,7 +95,7 @@ export default async function LandingResultPage({ params }: { params: Promise<{ 
   return (
     <>
       {back}
-      <PageHeader title={(row.result as LandingResult).nombre_marca || row.product} description={row.product}>
+      <PageHeader title={(row.result as LandingResult).nombre_marca || row.product} description={`${row.product} · ${modeInfo(row.mode).title}`}>
         {actions}
       </PageHeader>
       <LandingStudio {...studio} />

@@ -116,6 +116,11 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
               <p className="hint">Gasto en Gemini con tu tope: ~COP {budget.costCop}.</p>
             </div>
             <div>
+              <label className="label" htmlFor="points_landing_text">Landing rápida, textos o prompts cuesta</label>
+              <input id="points_landing_text" name="points_landing_text" type="number" min={0} defaultValue={settings.points_landing_text} className="input" />
+              <p className="hint">Sin fotos con IA. Gasto en Gemini: ~COP 40.</p>
+            </div>
+            <div>
               <label className="label" htmlFor="points_redo">Rehacer una foto cuesta</label>
               <input id="points_redo" name="points_redo" type="number" min={0} defaultValue={settings.points_redo} className="input" />
               <p className="hint">Gasto en Gemini: ~COP 140 (económico) o 240 (Nano Banana 2).</p>
@@ -142,7 +147,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
             {settings.points_redo && settings.points_landing
               ? ` y le sobran ${settings.points_monthly_kit % settings.points_landing} puntos (${Math.floor((settings.points_monthly_kit % settings.points_landing) / settings.points_redo)} fotos para rehacer)`
               : ""}
-            .
+            . O hasta <strong>{settings.points_landing_text ? Math.floor(settings.points_monthly_kit / settings.points_landing_text) : "∞"}</strong> en los formatos sin fotos con IA.
           </p>
         </fieldset>
 

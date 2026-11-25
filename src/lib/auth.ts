@@ -70,6 +70,7 @@ const DEFAULT_SETTINGS: Settings = {
   points_monthly_kit: 1000,
   points_monthly_member: 1000,
   points_landing: 270,
+  points_landing_text: 30,
   points_redo: 80,
 };
 

@@ -38,6 +38,8 @@ export interface Settings {
   points_monthly_kit: number;
   points_monthly_member: number;
   points_landing: number;
+  /** Formatos sin fotos con IA (rápida, textos, prompts). */
+  points_landing_text: number;
   points_redo: number;
 }
 

@@ -71,7 +71,67 @@ export type LandingResult = {
   resenas_reales?: boolean;
   aviso_imagenes?: string | null;
   imagenes?: ImageTexts;
+  /** Para las fotos (en inglés): aspecto del producto, persona y una escena por foto. */
+  producto_visual?: string;
+  persona?: string;
+  escenas?: Partial<Record<PhotoSlot, string>>;
 };
+
+/** Formatos que el alumno puede elegir. «completa» hace fotos con IA; los demás solo escriben (mucho más barato). */
+export type LandingMode = "completa" | "rapida" | "texto" | "prompts";
+export const LANDING_MODES: { id: LandingMode; title: string; desc: string; time: string; aiPhotos: boolean }[] = [
+  { id: "completa", title: "Landing completa", desc: "Textos + fotos con IA (después, usos y antes) + archivo para Shopify.", time: "~1 min", aiPhotos: true },
+  { id: "rapida", title: "Landing rápida", desc: "Todo armado con la foto de tu producto. Luego puedes subir tus fotos de Gemini.", time: "~40 s", aiPhotos: false },
+  { id: "texto", title: "Título y descripción", desc: "Título ganador, descripción con preguntas frecuentes y SEO, listos para pegar.", time: "~30 s", aiPhotos: false },
+  { id: "prompts", title: "Prompts de imágenes", desc: "Prompts para hacer tus fotos gratis en Gemini y armar tus imágenes ganadoras.", time: "~30 s", aiPhotos: false },
+];
+export const isLandingMode = (v: string | null | undefined): v is LandingMode => LANDING_MODES.some((m) => m.id === v);
+export const modeInfo = (v: string | null | undefined) => LANDING_MODES.find((m) => m.id === v) ?? LANDING_MODES[0];
+
+/** Las 3 fotos de fondo de las imágenes vendedoras (con IA, o hechas por el alumno en Gemini). */
+export type PhotoSlot = "despues" | "usos" | "antes";
+export const PHOTO_SLOTS: { id: PhotoSlot; title: string; what: string; usedIn: string }[] = [
+  { id: "despues", title: "Después", what: "Tu cliente feliz usando el producto", usedIn: "Principal y antes/después" },
+  { id: "usos", title: "Usos", what: "Cuadrícula de 4 fotos, una por cada uso", usedIn: "Usos y comparación" },
+  { id: "antes", title: "Antes", what: "El problema, sin el producto", usedIn: "Antes/después y comparación" },
+];
+
+const PHOTO_SPEC: Record<PhotoSlot, string> = {
+  despues: "Square 1:1 photo. Person in the center, face in the middle third of the image, the product clearly visible at its real size. Bright, warm, happy.",
+  usos: "Landscape 4:3 image made of a clean 2x2 grid of four equal photos separated by thin white lines. Each panel: one person using the product for one use, product clearly visible at its real size.",
+  antes: "Square 1:1 photo of the problem situation, no product anywhere, slightly dull and gloomy light, the problem obvious at first sight.",
+};
+
+/** Prompt (en inglés, funciona mejor) para que el alumno haga la foto gratis en Gemini adjuntando la foto de su producto. */
+export function photoPrompt(slot: PhotoSlot, r: LandingResult) {
+  const usos = r.imagenes?.usos_etiquetas?.length ? ` The four uses, in order (top-left, top-right, bottom-left, bottom-right): ${r.imagenes.usos_etiquetas.join(", ")}.` : "";
+  return [
+    "Create an ultra realistic commercial advertising photo for a Latin American online store.",
+    `Scene: ${r.escenas?.[slot] ?? ""}${slot === "usos" ? usos : ""}`,
+    slot !== "antes" ? `Person: ${r.persona ?? "a Latin American adult"}. Natural skin, genuine expression, realistic hands.` : "",
+    `Composition: ${PHOTO_SPEC[slot]}`,
+    slot !== "antes"
+      ? `Product: use EXACTLY the product in the attached photo (same shape, colors, packaging and label). ${r.producto_visual ?? ""} Keep it at its true real-world size.`
+      : "The product must NOT appear in this image.",
+    "Do NOT add any text, letters, logos, watermarks, stickers or price tags. Professional lighting, sharp focus, natural vibrant colors.",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+/** La descripción en texto simple (para pegar en el editor de Shopify, WhatsApp o donde quieras). */
+export function descriptionText(r: LandingResult) {
+  const b = r.bloques;
+  return [
+    `${b.dolor.emoji} ${b.dolor.titulo}\n${b.dolor.texto}`,
+    `${b.promesa.emoji} ${b.promesa.titulo}\n${b.promesa.texto}`,
+    `${b.formula.emoji} ${b.formula.titulo}\n${b.formula.beneficios.map((x) => `✅ ${x.nombre}: ${x.texto}`).join("\n")}`,
+    `${b.habito.emoji} ${b.habito.titulo}\n${b.habito.texto}`,
+    `${b.uso.emoji} ${b.uso.titulo}\n${b.uso.pasos.map((x, i) => `${i + 1}. ${x}`).join("\n")}`,
+    `${b.cierre.emoji} ${b.cierre.titulo}\n${b.cierre.texto}\n${b.cierre.llamado}`,
+    `${r.faq.titulo}\n${r.faq.items.map((f) => `▸ ${f.pregunta}\n${f.respuesta}`).join("\n\n")}`,
+  ].join("\n\n");
+}
 
 /**
  * Las 10 imágenes finales, en el orden de la galería de Shopify. Mezcla lo mejor de las 2 landings ganadoras:
